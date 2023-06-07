@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #define UDP_BROADCAST_PORT "55030"
+#define UDP_NEW_CLIENT_PORT "55031" 
 #define BROADCAST_ADDR "192.168.0.255"
 
 /**
@@ -20,12 +21,13 @@ int create_udb_broadcast_socket() {
     struct addrinfo hints, *addr_res;
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
+    hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_protocol = 0;
     hints.ai_flags = AI_PASSIVE;
 
-    if((status = getaddrinfo(NULL, UDP_BROADCAST_PORT, &hints, &addr_res)) != 0) {
+    // Пока что создаем сокет для тестирования broadcast рассылки на локальной машине
+    if((status = getaddrinfo(NULL, UDP_NEW_CLIENT_PORT, &hints, &addr_res)) != 0) {
         fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
         exit(1);
     }
@@ -41,7 +43,6 @@ int create_udb_broadcast_socket() {
         exit(2);
     }
 
-
     freeaddrinfo(addr_res);
     return sock;
 }
@@ -53,7 +54,7 @@ void send_test_data(int sock_udp)
     struct addrinfo hints, *addr_res;
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
+    hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_protocol = 0;
     hints.ai_flags = AI_PASSIVE;
@@ -75,9 +76,9 @@ void send_test_data(int sock_udp)
 int main(int argc, char *argv[])
 {
     int sock = create_udb_broadcast_socket();
-    printf("Hello, I am future chat server...\n");
+    printf("Hello, I am future chat client...\n");
     printf("Send a msg on local broadcast..\n");
-
+    send_test_data(sock);
     close(sock);
     return 0;
 }

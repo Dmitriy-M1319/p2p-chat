@@ -1,3 +1,4 @@
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,27 +46,16 @@ int create_udb_broadcast_socket() {
 
 void recv_data_from_test_client(int sock_udp) {
     char buf[1024];
-    int status, accept_sock;
-    struct addrinfo hints, *addr_res;
+    int status;
+    struct sockaddr_in result;
+    socklen_t res_len = sizeof(result);
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = 0;
-    hints.ai_flags = AI_PASSIVE;
-
-    if((status = getaddrinfo(NULL, UDP_BROADCAST_PORT, &hints, &addr_res)) != 0) {
-        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
-        exit(1);
-    }
-
-    if(recvfrom(sock_udp, buf, 1024, 0, addr_res->ai_addr, &addr_res->ai_addrlen) == -1) {
+    if(recvfrom(sock_udp, buf, 1024, 0, (struct sockaddr *)&result, &res_len) == -1) {
         fprintf(stderr, "Failed to receive data from chat client: %s\n", strerror(errno));
         exit(2);
     }
 
     printf("Message from client: %s\n", buf);
-    freeaddrinfo(addr_res);
 }
 
 int main(int argc, char *argv[])
