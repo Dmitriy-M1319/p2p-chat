@@ -41,7 +41,7 @@ struct client_connection_node *get_client_info(struct client_connection_node *li
  * Удалить определенное подключение из списка
  * Возвращает -1 в результате поиска узла в списке
  */
-int remove_connection_(struct client_connection_node *list, const char *name);
+int remove_connection(struct client_connection_node *list, const char *name);
 
 /**
  * Очищает весь список подключений к клиентам
