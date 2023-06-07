@@ -1,84 +1,33 @@
+#include "udp_client_connection_query.h"
+#include "connection_list.h"
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/ip.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <unistd.h>
 
-#define UDP_BROADCAST_PORT "55030"
-#define UDP_NEW_CLIENT_PORT "55031" 
-#define BROADCAST_ADDR "192.168.0.255"
+// Список всех подключений для клиентам в локальной сети
+struct client_connection_node *connections = NULL;
 
-/**
- * Создать сокет для широковещательной рассылки запроса на включение в сеть
- */
-int create_udb_broadcast_socket() {
-    int sock, status;
-    struct addrinfo hints, *addr_res;
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = 0;
-    hints.ai_flags = AI_PASSIVE;
-
-    // Пока что создаем сокет для тестирования broadcast рассылки на локальной машине
-    if((status = getaddrinfo(NULL, UDP_NEW_CLIENT_PORT, &hints, &addr_res)) != 0) {
-        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
-        exit(1);
-    }
-
-    if((sock = socket(addr_res->ai_family, addr_res->ai_socktype, addr_res->ai_protocol)) == -1) {
-        fprintf(stderr, "Failed to create socket for invitation in network: %s\n", strerror(errno));
-        exit(2);
-    }
-
-    int broadcast = 1;
-    if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1) {
-        fprintf(stderr, "Failed to set socket for broadcast for invitation in network: %s\n", strerror(errno));
-        exit(2);
-    }
-
-    freeaddrinfo(addr_res);
-    return sock;
-}
-
-
-void send_test_data(int sock_udp)
+void query_invitation_in_network()
 {
-    int status;
-    struct addrinfo hints, *addr_res;
+    int query_socket;
+    struct sockaddr_in info;
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = 0;
-    hints.ai_flags = AI_PASSIVE;
-
-    if((status = getaddrinfo(NULL, UDP_BROADCAST_PORT, &hints, &addr_res)) != 0) {
-        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
+    query_socket = create_udb_broadcast_socket();
+        // Подумать над обработкой разных ошибок
+    if (send_connection_query(query_socket) == -1) {
         exit(1);
     }
 
-    const char *msg = "Hello, I want to talk with you...";
+    // дальше пока не понимать...
 
-    if(sendto(sock_udp, msg, strlen(msg), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
-        fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
-        exit(3);
-    }
-    freeaddrinfo(addr_res);
 }
+
+
 
 int main(int argc, char *argv[])
 {
-    int sock = create_udb_broadcast_socket();
     printf("Hello, I am future chat client...\n");
     printf("Send a msg on local broadcast..\n");
-    send_test_data(sock);
-    close(sock);
     return 0;
 }

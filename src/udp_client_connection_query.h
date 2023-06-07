@@ -30,6 +30,13 @@ struct query_datagramm
 int create_udb_broadcast_socket();
 
 /**
+ * Создать сокет для отправки ответа новому клиенту, что он может быть приглашен
+ * Возвращает дескриптор сокета в случае успеха
+ * Возвращает -1 в случае ошибки и выставляет errno
+ */
+int create_simple_udp_socket();
+
+/**
  * Отправить запрос на широковещательный адрес сети для включения клиента в сеть
  * Возвращает -1 в случае ошибки
  */
@@ -47,5 +54,6 @@ int create_tcp_client_socket();
  * В случае ошибки возвращается -1
  */
 int send_connection_response(int udp_socket, struct sockaddr_in *client_info, int client_port);
+
 
 #endif

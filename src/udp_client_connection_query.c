@@ -11,6 +11,7 @@
 
 #define DEBUG_LOCAL
 
+
 int create_udb_broadcast_socket()
 {
     int sock;
@@ -20,8 +21,27 @@ int create_udb_broadcast_socket()
     }
 
     int broadcast = 1;
+    int timeout = 6000;
+
     if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1) {
         fprintf(stderr, "Failed to set socket for broadcast for invitation in network: %s\n", strerror(errno));
+        return -1;
+    }
+
+    if(setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == -1) {
+        fprintf(stderr, "Failed to set socket for timeout for invitation in network: %s\n", strerror(errno));
+        return -1;
+    }
+
+    return sock;
+}
+
+
+int create_simple_udp_socket()
+{
+    int sock;
+    if((sock = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
+        fprintf(stderr, "Failed to create socket for response to client: %s\n", strerror(errno));
         return -1;
     }
 
@@ -48,18 +68,21 @@ int send_connection_query(int udp_socket)
         fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
         return -1;
     }
+    for (struct addrinfo *p = addr_res; p != NULL; p = p->ai_next) {
+        if (p->ai_family == AF_INET) {
+            // Создаем структуру с данными для отправки
+            struct query_datagramm dgram;
+            dgram.port = 0;
+            strncpy(dgram.msg, CONNECTION_UDP_REQUEST, sizeof(CONNECTION_UDP_REQUEST));
 
-    // Создаем структуру с данными для отправки
-    struct query_datagramm dgram;
-    dgram.port = 0;
-    strncpy(dgram.msg, CONNECTION_UDP_REQUEST, sizeof(CONNECTION_UDP_REQUEST));
-
-    // и теперь отсылаем данные на запрос
-    if (sendto(udp_socket, &dgram, sizeof(dgram), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
-        fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
-        return -1;
+            // и теперь отсылаем данные на запрос
+            if (sendto(udp_socket, &dgram, sizeof(dgram), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
+                fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
+                return -1;
+            }
+            break;
+        }
     }
-
     freeaddrinfo(addr_res);
     return 0;
 }
@@ -90,9 +113,14 @@ int create_tcp_client_socket(st)
         return -1;
     }
 
-    if((status = bind(sock, addr_res->ai_addr, addr_res->ai_addrlen)) == -1) {
-        fprintf(stderr, "Failed to bind socket for new client: %s\n", strerror(errno));
-        return -1;
+    for (struct addrinfo *p = addr_res; p != NULL; p = p->ai_next) {
+        if (p->ai_family == AF_INET) {
+            if((status = bind(sock, addr_res->ai_addr, addr_res->ai_addrlen)) == -1) {
+                fprintf(stderr, "Failed to bind socket for new client: %s\n", strerror(errno));
+                return -1;
+            }   
+            break;
+        }
     }
 
     freeaddrinfo(addr_res);
@@ -120,16 +148,21 @@ int send_connection_response(int udp_socket, struct sockaddr_in *client_info, in
         return -1;
     }
 
-    // Создаем структуру с данными для отправки
-    struct query_datagramm dgram;
-    dgram.port = client_port;
-    strncpy(dgram.msg, CONNECTION_UDP_RESPONSE, sizeof(CONNECTION_UDP_RESPONSE));
+    for (struct addrinfo *p = addr_res; p != NULL; p = p->ai_next) {
+        if (p->ai_family == AF_INET) {
+            // Создаем структуру с данными для отправки
+            struct query_datagramm dgram;
+            dgram.port = client_port;
+            strncpy(dgram.msg, CONNECTION_UDP_RESPONSE, sizeof(CONNECTION_UDP_RESPONSE));
 
-    if (sendto(udp_socket, &dgram, sizeof(dgram), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
-        fprintf(stderr, "Failed to send response to new client: %s\n", strerror(errno));
-        return -1;
+            if (sendto(udp_socket, &dgram, sizeof(dgram), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
+                fprintf(stderr, "Failed to send response to new client: %s\n", strerror(errno));
+                return -1;
+            }
+
+            break;
+        }
     }
-
     freeaddrinfo(addr_res);
     return 0;
 }
