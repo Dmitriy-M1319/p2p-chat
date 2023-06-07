@@ -10,7 +10,6 @@
 #include <unistd.h>
 
 #define UDP_BROADCAST_PORT "55030"
-#define BROADCAST_ADDR "192.168.0.255"
 
 /**
  * Создать сокет для широковещательной рассылки запроса на включение в сеть
@@ -35,12 +34,6 @@ int create_udb_broadcast_socket() {
         exit(2);
     }
 
-    int broadcast = 1;
-    if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1) {
-        fprintf(stderr, "Failed to set socket for broadcast for invitation in network: %s\n", strerror(errno));
-        exit(2);
-    }
-
     if((status = bind(sock, addr_res->ai_addr, addr_res->ai_addrlen)) == -1) {
         fprintf(stderr, "Failed to bind socket with port for invitation in network: %s\n", strerror(errno));
         exit(2);
@@ -50,10 +43,9 @@ int create_udb_broadcast_socket() {
     return sock;
 }
 
-
-void send_test_data(int sock_udp)
-{
-    int status;
+void recv_data_from_test_client(int sock_udp) {
+    char buf[1024];
+    int status, accept_sock;
     struct addrinfo hints, *addr_res;
 
     memset(&hints, 0, sizeof(hints));
@@ -67,26 +59,37 @@ void send_test_data(int sock_udp)
         exit(1);
     }
 
-    const char *msg = "Hello, I want to talk with you...";
-
-    if((status = connect(sock_udp, addr_res->ai_addr, addr_res->ai_addrlen)) == -1) {
-        fprintf(stderr, "Failed to connect to port for invitation in network: %s\n", strerror(errno));
+    if(listen(sock_udp, 5) == -1) {
+        fprintf(stderr, "Failed to listen: %s\n", strerror(errno));
         exit(2);
     }
 
-    if(send(sock_udp, msg, strlen(msg), 0) == -1) {
-        fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
+    struct sockaddr_storage client_addr;
+    socklen_t client_addr_size;
+
+    client_addr_size = sizeof(client_addr);
+    if((accept_sock = accept(sock_udp, (struct sockaddr *)&client_addr, &client_addr_size)) != 0) {
+        fprintf(stderr, "Failed to accept query from client: %s\n", strerror(errno));
         exit(3);
     }
+
+    if(recv(accept_sock, buf, 1024, 0) == -1) {
+        fprintf(stderr, "Failed to receive data from chat client: %s\n", strerror(errno));
+        exit(2);
+    }
+
+    printf("Message from client: %s\n", buf);
+    
+    close(accept_sock);
     freeaddrinfo(addr_res);
 }
 
 int main(int argc, char *argv[])
 {
     int sock = create_udb_broadcast_socket();
-    printf("Hello, I am future chat server...\n");
-    printf("Send a msg on local broadcast..\n");
-
+    printf("Hello, I am test chat server...\n");
+    printf("Listen a msg from local client..\n");
+    recv_data_from_test_client(sock);
     close(sock);
     return 0;
 }
