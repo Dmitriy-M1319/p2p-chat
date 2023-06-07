@@ -59,28 +59,12 @@ void recv_data_from_test_client(int sock_udp) {
         exit(1);
     }
 
-    if(listen(sock_udp, 5) == -1) {
-        fprintf(stderr, "Failed to listen: %s\n", strerror(errno));
-        exit(2);
-    }
-
-    struct sockaddr_storage client_addr;
-    socklen_t client_addr_size;
-
-    client_addr_size = sizeof(client_addr);
-    if((accept_sock = accept(sock_udp, (struct sockaddr *)&client_addr, &client_addr_size)) != 0) {
-        fprintf(stderr, "Failed to accept query from client: %s\n", strerror(errno));
-        exit(3);
-    }
-
-    if(recv(accept_sock, buf, 1024, 0) == -1) {
+    if(recvfrom(sock_udp, buf, 1024, 0, addr_res->ai_addr, &addr_res->ai_addrlen) == -1) {
         fprintf(stderr, "Failed to receive data from chat client: %s\n", strerror(errno));
         exit(2);
     }
 
     printf("Message from client: %s\n", buf);
-    
-    close(accept_sock);
     freeaddrinfo(addr_res);
 }
 

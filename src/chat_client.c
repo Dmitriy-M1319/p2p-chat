@@ -41,10 +41,6 @@ int create_udb_broadcast_socket() {
         exit(2);
     }
 
-    if((status = bind(sock, addr_res->ai_addr, addr_res->ai_addrlen)) == -1) {
-        fprintf(stderr, "Failed to bind socket with port for invitation in network: %s\n", strerror(errno));
-        exit(2);
-    }
 
     freeaddrinfo(addr_res);
     return sock;
@@ -69,12 +65,7 @@ void send_test_data(int sock_udp)
 
     const char *msg = "Hello, I want to talk with you...";
 
-    if((status = connect(sock_udp, addr_res->ai_addr, addr_res->ai_addrlen)) == -1) {
-        fprintf(stderr, "Failed to connect to port for invitation in network: %s\n", strerror(errno));
-        exit(2);
-    }
-
-    if(send(sock_udp, msg, strlen(msg), 0) == -1) {
+    if(sendto(sock_udp, msg, strlen(msg), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
         fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
         exit(3);
     }
