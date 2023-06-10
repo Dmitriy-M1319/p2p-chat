@@ -50,6 +50,11 @@ int create_simple_udp_socket();
 int send_connection_query(int udp_socket, const char *local_nickname);
 
 /**
+ * Получает адрес узла, на котором запускается клиент, в локальной сети
+ */
+int get_local_addr(struct sockaddr_in *addr_out, socklen_t *length);
+
+/**
  * Создать новое TCP подключение для клиента, если поступил запрос на подключение в сеть, и делает его привязку к новому порту
  * Возвращает дескриптор сокета в случае успеха
  * В случае ошибки установления соединения возвращает -1
@@ -60,7 +65,7 @@ int create_tcp_client_socket();
  * Отправить информацию новому клиенту, что для него готов сокет и он может подключаться
  * В случае ошибки возвращается -1
  */
-int send_connection_response(int udp_socket, struct sockaddr_in *client_info, int client_port);
+int send_connection_response(int udp_socket, struct sockaddr_in *client_info, struct query_datagramm *data);
 
 
 /**

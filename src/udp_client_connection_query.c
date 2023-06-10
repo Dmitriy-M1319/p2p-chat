@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -22,15 +24,8 @@ int create_udb_broadcast_socket()
     }
 
     int broadcast = 1;
-    int timeout = 6000;
-
     if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1) {
         fprintf(stderr, "Failed to set socket for broadcast for invitation in network: %s\n", strerror(errno));
-        return -1;
-    }
-
-    if(setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == -1) {
-        fprintf(stderr, "Failed to set socket for timeout for invitation in network: %s\n", strerror(errno));
         return -1;
     }
 
@@ -89,47 +84,58 @@ int send_connection_query(int udp_socket, const char *nickname)
 }
 
 
-int create_tcp_client_socket()
+int get_local_addr(struct sockaddr_in *addr_out, socklen_t *length)
 {
-    int sock, status;
-    struct addrinfo hints, *addr_res;
-
-    if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
-        fprintf(stderr, "Failed to create TCP socket for new client: %s\n", strerror(errno));
+    char hostname[1024];
+    int status;
+    struct addrinfo hints, *local_addr;
+    if(gethostname(hostname, 1024) == -1){
+        fprintf(stderr, "Failed to get hostname for client machine: %s\n", strerror(errno));
         return -1;
     }
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = 0;
-    hints.ai_flags = AI_PASSIVE;
 
-#ifdef DEBUG_LOCAL
-    if((status = getaddrinfo(NULL, UDP_NEW_CLIENT_PORT, &hints, &addr_res)) != 0) {
-#else
-    if((status = getaddrinfo(BROADCAST_ADDR, UDP_NEW_CLIENT_PORT &hints, &addr_res)) != 0) {
-#endif
+    if ((status = getaddrinfo(hostname, NULL, &hints, &local_addr)) == -1) {
         fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
         return -1;
     }
 
-    for (struct addrinfo *p = addr_res; p != NULL; p = p->ai_next) {
-        if (p->ai_family == AF_INET) {
-            if((status = bind(sock, addr_res->ai_addr, addr_res->ai_addrlen)) == -1) {
-                fprintf(stderr, "Failed to bind socket for new client: %s\n", strerror(errno));
-                return -1;
-            }   
-            break;
+    char ip_str[INET_ADDRSTRLEN];
+    for (struct addrinfo *p = local_addr; p != NULL; p = p->ai_next) {
+        struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+        struct in_addr *addr = &(ipv4->sin_addr);
+        inet_ntop(p->ai_family, addr, ip_str, sizeof(ip_str));
+
+        if (strstr(ip_str, "192")) {
+            memcpy(addr_out, ipv4, sizeof(struct sockaddr_in));
+            memcpy(length, &p->ai_addrlen, sizeof(socklen_t));
+            freeaddrinfo(local_addr);
+            return 0;
         }
     }
 
-    freeaddrinfo(addr_res);
+    freeaddrinfo(local_addr);
+    return -1;
+}
+
+
+int create_tcp_client_socket()
+{
+    int sock, status;
+    if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+        fprintf(stderr, "Failed to create TCP socket for new client: %s\n", strerror(errno));
+        return -1;
+    }
+
     return sock;
 }
 
 
-int send_connection_response(int udp_socket, struct sockaddr_in *client_info, int client_port)
+int send_connection_response(int udp_socket, const char *nickname, int client_port)
 {
     int status;
     struct addrinfo hints, *addr_res;
@@ -196,6 +202,7 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
     }
 
     add_new_connection(connections, data->nickname, new_tcp_client_socket, (struct sockaddr_in *)client_addr->ai_addr);
+    freeaddrinfo(client_addr);
 
     return new_tcp_client_socket;
 }
