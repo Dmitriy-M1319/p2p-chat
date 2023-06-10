@@ -11,8 +11,10 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <pthread.h>
 
-// Список всех подключений для клиентам в локальной сети
+
+// Список всех подключений для клиентов в локальной сети
 client_connection *connections = NULL;
 
 
@@ -34,21 +36,30 @@ void query_invitation_in_network(const char *client_name)
     struct sockaddr addr;
     socklen_t addr_len;
     int new_cl_socket;
-    // Ждем получения ответа от других клиентов чата (походу это надо в отдельный поток вынести
-    // как разделенное управление одним сокетом
-    if (recvfrom(query_socket, &data, sizeof(data), 0, &addr, &addr_len) == -1) {
-        fprintf(stderr, "failed to get connection_info from other client");
-        exit(3);
-    }
-    
     connections = create_client_list();
-    // Создаем новое подключение с клиентом (надо в отдельном потоке делать)
-    if(create_client_connection(&data, connections) == -1) {
-        fprintf(stderr, "Failed to create new connection to client\n");
-        exit(3);
+
+    // Ждем получения ответа от других клиентов чата
+    while(1) {
+        if (recvfrom(query_socket, &data, sizeof(data), 0, &addr, &addr_len) == -1) {
+            if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                // Ответа нет: или мы первые в сети, или подключились ко всем клиентам
+                break;
+            }
+            else {
+                fprintf(stderr, "failed to get connection_info from other client");
+                exit(3);
+            }
+        }
+
+        pthread_t new_thread;
+    
+        // Создаем новое подключение с клиентом в отдельном потоке
+        if(create_client_connection(&data, connections) == -1) {
+            fprintf(stderr, "Failed to create new connection to client\n");
+            exit(3);
+        }
     }
 }
-
 
 
 void listen_new_clients(const char *client_name)
@@ -134,7 +145,18 @@ void listen_new_clients(const char *client_name)
 
 int main(int argc, char *argv[])
 {
+    char nickname[DATAGRAM_NICKNAME_LENGTH];
+    char ch;
     printf("Hello, I am future chat client...\n");
-    printf("Send a msg on local broadcast..\n");
+    printf("Введите имя, под которым вы будете видны остальным участникам: ");
+    for (int i = 0; (ch = getchar()) != EOF; i++) {
+        nickname[i] = ch;
+    } 
+    printf("Подключение к сети...\n");
+    query_invitation_in_network(nickname);
+
+    // Отдельный поток
+    listen_new_clients(nickname);
+
     return 0;
 }
