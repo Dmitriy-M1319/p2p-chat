@@ -65,8 +65,7 @@ int create_tcp_client_socket();
  * Отправить информацию новому клиенту, что для него готов сокет и он может подключаться
  * В случае ошибки возвращается -1
  */
-int send_connection_response(int udp_socket, struct sockaddr_in *client_info, struct query_datagramm *data);
-
+int send_connection_response(int udp_socket, struct sockaddr *client_info, struct query_datagramm *data);
 
 /**
  * Создать новое TCP - подключение с клиентом, который ответил на запрос о включении в сеть

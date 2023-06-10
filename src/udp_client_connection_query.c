@@ -1,6 +1,5 @@
 #include "udp_client_connection_query.h"
-#include "connection_list.h"
-#include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,10 +8,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <arpa/inet.h>
 #include <errno.h>
-
-#define DEBUG_LOCAL
 
 
 int create_udb_broadcast_socket()
@@ -40,46 +36,29 @@ int create_simple_udp_socket()
         fprintf(stderr, "Failed to create socket for response to client: %s\n", strerror(errno));
         return -1;
     }
-
     return sock;
 }
 
 
 int send_connection_query(int udp_socket, const char *nickname)
 {
-    int status;
-    struct addrinfo hints, *addr_res;
+    struct sockaddr_in local_client;
+    socklen_t length;
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = 0;
-    hints.ai_flags = AI_PASSIVE;
-
-#ifdef DEBUG_LOCAL
-    if((status = getaddrinfo(NULL, UDP_BROADCAST_PORT, &hints, &addr_res)) != 0) {
-#else
-    if((status = getaddrinfo(BROADCAST_ADDR, UDP_BROADCAST_PORT, &hints, &addr_res)) != 0) {
-#endif
-        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
+    if (get_local_addr(&local_client, &length) == -1) {
         return -1;
     }
-    for (struct addrinfo *p = addr_res; p != NULL; p = p->ai_next) {
-        if (p->ai_family == AF_INET) {
-            // Создаем структуру с данными для отправки
-            struct query_datagramm dgram;
-            dgram.port = 0;
-            strncpy(dgram.msg, CONNECTION_UDP_REQUEST, sizeof(CONNECTION_UDP_REQUEST));
 
-            // и теперь отсылаем данные на запрос
-            if (sendto(udp_socket, &dgram, sizeof(dgram), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
-                fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
-                return -1;
-            }
-            break;
-        }
+    local_client.sin_port = htons((uint16_t)atoi(UDP_BROADCAST_PORT));
+    struct query_datagramm dgram;
+    dgram.port = 0;
+    strncpy(dgram.msg, CONNECTION_UDP_REQUEST, sizeof(CONNECTION_UDP_REQUEST));
+    strcpy(dgram.nickname, nickname);
+
+    if (sendto(udp_socket, &dgram, sizeof(dgram), 0, (struct sockaddr *)&local_client, length) == -1) {
+        fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
+        return -1;
     }
-    freeaddrinfo(addr_res);
     return 0;
 }
 
@@ -135,49 +114,21 @@ int create_tcp_client_socket()
 }
 
 
-int send_connection_response(int udp_socket, const char *nickname, int client_port)
+int send_connection_response(int udp_socket, struct sockaddr *client_info, struct query_datagramm *data)
 {
-    int status;
-    struct addrinfo hints, *addr_res;
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = 0;
-    hints.ai_flags = AI_PASSIVE;
-
-#ifdef DEBUG_LOCAL
-    if((status = getaddrinfo("localhost", NULL, &hints, &addr_res)) != 0) {
-#else
-    if((status = getaddrinfo(BROADCAST_ADDR, NULL, &hints, &addr_res)) != 0) {
-#endif
-        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
+    strncpy(data->msg, CONNECTION_UDP_RESPONSE, sizeof(CONNECTION_UDP_RESPONSE));
+    if (sendto(udp_socket, data, 
+                sizeof(struct query_datagramm), 0, 
+                client_info, (socklen_t)sizeof(*client_info)) == -1) {
+        fprintf(stderr, "Failed to send response to new client: %s\n", strerror(errno));
         return -1;
     }
-
-    for (struct addrinfo *p = addr_res; p != NULL; p = p->ai_next) {
-        if (p->ai_family == AF_INET) {
-            // Создаем структуру с данными для отправки
-            struct query_datagramm dgram;
-            dgram.port = client_port;
-            strncpy(dgram.msg, CONNECTION_UDP_RESPONSE, sizeof(CONNECTION_UDP_RESPONSE));
-
-            if (sendto(udp_socket, &dgram, sizeof(dgram), 0, addr_res->ai_addr, addr_res->ai_addrlen) == -1) {
-                fprintf(stderr, "Failed to send response to new client: %s\n", strerror(errno));
-                return -1;
-            }
-
-            break;
-        }
-    }
-    freeaddrinfo(addr_res);
     return 0;
 }
 
 int create_client_connection(struct query_datagramm *data, client_connection *connections)
 {
     int status, new_tcp_client_socket;
-    char port[5];
     struct addrinfo hints, *client_addr;
 
     memset(&hints, 0, sizeof(hints));
@@ -185,9 +136,8 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_protocol = 0;
 
-    sprintf(port, "%d", data->port);
-
-    if((status = getaddrinfo(data->address, port, &hints, &client_addr)) != 0) {
+    // Для нового клиента выхватываем первый попавшийся пустой порт
+    if((status = getaddrinfo(data->address, NULL, &hints, &client_addr)) != 0) {
         fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
         return -1;
     }

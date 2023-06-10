@@ -1,12 +1,16 @@
 #include "udp_client_connection_query.h"
 #include "connection_list.h"
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 #include <errno.h>
+#include <unistd.h>
 
 // Список всех подключений для клиентам в локальной сети
 client_connection *connections = NULL;
@@ -73,7 +77,7 @@ void listen_new_clients(const char *client_name)
 
     freeaddrinfo(broadcast_addr);
 
-    // Теперь ждем входящих запросов (пока ждем всегда, но потом надо будет забиндить выход из цикла на сигнал)
+    // Теперь ждем входящих запросов 
     while (1) {
         struct query_datagramm request; 
         int req_tcp_socket;
@@ -83,12 +87,15 @@ void listen_new_clients(const char *client_name)
         }
         // Как только получили запрос, сразу же создаем все условия
         req_tcp_socket = create_tcp_client_socket();
+
         struct addrinfo *client_req;
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_INET;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = 0;
-        if ((status = getaddrinfo(request.address, UDP_NEW_CLIENT_PORT, &hints, &client_req)) == -1) {
+
+        // Здесь тоже выделяем первый попавшийся незанятый порт для клиента
+        if ((status = getaddrinfo(request.address, NULL, &hints, &client_req)) == -1) {
             fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
             exit(2);
         }
@@ -98,12 +105,28 @@ void listen_new_clients(const char *client_name)
             exit(1);
         }
 
-        // Вот этот момент надо переработать TODO
-        // Здесь нам надо отправить клиенту адрес и порт нового подключения
-        send_connection_response(udp_listen_socket, (struct sockaddr_in *)client_req->ai_addr, atoi(UDP_NEW_CLIENT_PORT));
+        struct sockaddr_in me;
+        socklen_t me_ln = sizeof(me);
+
+        if (get_local_addr(&me, &me_ln) == -1) {
+            exit(1);
+        }
+
+        struct query_datagramm response;
+        struct sockaddr_in *ipv4 = (struct sockaddr_in *)client_req;
+        response.port = ipv4->sin_port;
+        strcpy(response.nickname, client_name);
+        char ip_str[INET_ADDRSTRLEN];
+        inet_ntop(ipv4->sin_family, &ipv4->sin_addr, ip_str, sizeof(ip_str));
+
         listen(req_tcp_socket, 1);
+        // Тут есть вероятность, что подключаемый клиент отправит запрос раньше, чем дело
+        // дойдет до accept
+        send_connection_response(udp_listen_socket, client_req->ai_addr, &response);
         int new_tcp_sock = accept(req_tcp_socket, NULL, NULL);
         add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)client_req->ai_addr);
+        freeaddrinfo(client_req);
+        close(req_tcp_socket);
     }
     
 }
