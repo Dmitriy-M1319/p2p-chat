@@ -2,11 +2,16 @@
 #define UDP_CLIENT_CONNECTION_QUERY_H
 
 
+#include "connection_list.h"
 #include <netinet/in.h>
+// ----- Вот это все дело вынести в конфиг потом
 #define UDP_NEW_CLIENT_PORT "55031" 
 #define UDP_BROADCAST_PORT "55030"
 #define BROADCAST_ADDR "192.168.0.255"
+// ---------------------------------------------
 #define DATAGRAM_MSG_LENGTH 30
+#define DATAGRAM_ADDR_LENGTH 16
+#define DATAGRAM_NICKNAME_LENGTH 255
 
 #define CONNECTION_UDP_REQUEST "request on connection"
 #define CONNECTION_UDP_RESPONSE "responce on connection query"
@@ -19,6 +24,8 @@
 struct query_datagramm
 {
     char msg[DATAGRAM_MSG_LENGTH];
+    char address[DATAGRAM_ADDR_LENGTH];
+    char nickname[DATAGRAM_NICKNAME_LENGTH];
     int port;
 };
 
@@ -40,7 +47,7 @@ int create_simple_udp_socket();
  * Отправить запрос на широковещательный адрес сети для включения клиента в сеть
  * Возвращает -1 в случае ошибки
  */
-int send_connection_query(int udp_socket);
+int send_connection_query(int udp_socket, const char *local_nickname);
 
 /**
  * Создать новое TCP подключение для клиента, если поступил запрос на подключение в сеть, и делает его привязку к новому порту
@@ -56,4 +63,9 @@ int create_tcp_client_socket();
 int send_connection_response(int udp_socket, struct sockaddr_in *client_info, int client_port);
 
 
+/**
+ * Создать новое TCP - подключение с клиентом, который ответил на запрос о включении в сеть
+ * В случае ошибки возвращает -1
+ */
+int create_client_connection(struct query_datagramm *data, client_connection *connections);
 #endif

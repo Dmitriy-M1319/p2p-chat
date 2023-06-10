@@ -3,13 +3,20 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-
-int initialize_client_list(struct client_connection_node *head)
+struct client_connection_node
 {
-    if((head = (struct client_connection_node *)malloc(sizeof(struct client_connection_node))) == NULL) {
-        return -1;
-    }
-    return 0;
+    char client_name[CLIENT_NAME_MAX_LENGTH];
+    int client_socket;
+    struct sockaddr_in client_address_info;
+    struct client_connection_node *next;
+};
+
+struct client_connection_node *create_client_list()
+{
+    struct client_connection_node *head = (struct client_connection_node *)malloc(sizeof(struct client_connection_node));
+    strncpy(head->client_name, " ", CLIENT_NAME_MAX_LENGTH);
+    head->client_socket = -1;
+    return head;
 }
 
 
@@ -80,7 +87,9 @@ int free_connection_list(struct client_connection_node *list)
         list = list->next;
 
         // Закрываем сокет
-        close(destroyed->client_socket);
+        if (destroyed->client_socket != -1) {
+            close(destroyed->client_socket);
+        }
         free(destroyed);
     }
 

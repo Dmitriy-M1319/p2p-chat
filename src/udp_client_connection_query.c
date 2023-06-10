@@ -1,4 +1,5 @@
 #include "udp_client_connection_query.h"
+#include "connection_list.h"
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +50,7 @@ int create_simple_udp_socket()
 }
 
 
-int send_connection_query(int udp_socket)
+int send_connection_query(int udp_socket, const char *nickname)
 {
     int status;
     struct addrinfo hints, *addr_res;
@@ -88,7 +89,7 @@ int send_connection_query(int udp_socket)
 }
 
 
-int create_tcp_client_socket(st)
+int create_tcp_client_socket()
 {
     int sock, status;
     struct addrinfo hints, *addr_res;
@@ -165,4 +166,36 @@ int send_connection_response(int udp_socket, struct sockaddr_in *client_info, in
     }
     freeaddrinfo(addr_res);
     return 0;
+}
+
+int create_client_connection(struct query_datagramm *data, client_connection *connections)
+{
+    int status, new_tcp_client_socket;
+    char port[5];
+    struct addrinfo hints, *client_addr;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = 0;
+
+    sprintf(port, "%d", data->port);
+
+    if((status = getaddrinfo(data->address, port, &hints, &client_addr)) != 0) {
+        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
+        return -1;
+    }
+
+    new_tcp_client_socket = socket(client_addr->ai_family, 
+            client_addr->ai_socktype, 
+            client_addr->ai_protocol);
+
+    if(connect(new_tcp_client_socket, client_addr->ai_addr, client_addr->ai_addrlen) != 0) {
+        fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
+        return -1;
+    }
+
+    add_new_connection(connections, data->nickname, new_tcp_client_socket, (struct sockaddr_in *)client_addr->ai_addr);
+
+    return new_tcp_client_socket;
 }
