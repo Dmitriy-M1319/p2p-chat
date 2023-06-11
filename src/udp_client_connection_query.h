@@ -6,8 +6,8 @@
 #include <netinet/in.h>
 // ----- Вот это все дело вынести в конфиг потом
 #define UDP_NEW_CLIENT_PORT "55031" 
-#define UDP_BROADCAST_PORT "55030"
-#define BROADCAST_ADDR "192.168.0.255"
+#define UDP_BROADCAST_PORT 55030
+#define BROADCAST_ADDR "255.255.255.255"
 // ---------------------------------------------
 #define DATAGRAM_MSG_LENGTH 30
 #define DATAGRAM_ADDR_LENGTH 16

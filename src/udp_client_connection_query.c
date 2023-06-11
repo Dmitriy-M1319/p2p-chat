@@ -1,4 +1,5 @@
 #include "udp_client_connection_query.h"
+#include <netinet/in.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,20 +52,25 @@ int create_simple_udp_socket()
 
 int send_connection_query(int udp_socket, const char *nickname)
 {
-    struct sockaddr_in local_client;
+    struct sockaddr_in local_client, broadcast_addr;
     socklen_t length;
 
     if (get_local_addr(&local_client, &length) == -1) {
         return -1;
     }
 
-    local_client.sin_port = htons((uint16_t)atoi(UDP_BROADCAST_PORT));
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = htons(UDP_BROADCAST_PORT);
+    inet_aton(BROADCAST_ADDR, &(broadcast_addr.sin_addr));
+    length = sizeof(broadcast_addr);
+
     struct query_datagramm dgram;
     dgram.port = 0;
     strncpy(dgram.msg, CONNECTION_UDP_REQUEST, sizeof(CONNECTION_UDP_REQUEST));
     strncpy(dgram.nickname, nickname, DATAGRAM_NICKNAME_LENGTH);
+    inet_ntop(local_client.sin_family, &(local_client.sin_addr), dgram.address, sizeof(dgram.address));
 
-    if (sendto(udp_socket, &dgram, sizeof(dgram), 0, (struct sockaddr *)&local_client, length) == -1) {
+    if (sendto(udp_socket, &dgram, sizeof(dgram), 0, (struct sockaddr *)&broadcast_addr, length) == -1) {
         fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
         return -1;
     }

@@ -24,6 +24,7 @@ struct thread_args
     client_connection *connection_list;
 };
 
+
 void *thread_connection(void *args)
 {
     struct thread_args *elements = (struct thread_args *)args;
@@ -38,6 +39,7 @@ void *thread_connection(void *args)
     }
     return NULL;
 }
+
 
 void query_invitation_in_network(const char *client_name)
 {
@@ -87,22 +89,22 @@ void *listen_new_clients(void *client_name)
 {
     // вот эта вещь тоже должна наверное висеть в отдельном потоке 
     int udp_listen_socket, status;
-    struct addrinfo hints, *broadcast_addr;
+    struct sockaddr_in broadcast_addr, local_addr;
+    socklen_t length = sizeof(broadcast_addr);
+    socklen_t local_length;
+    struct addrinfo hints;
 
     if ((udp_listen_socket = create_simple_udp_socket()) == -1) {
         exit(1);
     }
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = 0;
-    if ((status = getaddrinfo(BROADCAST_ADDR, UDP_BROADCAST_PORT, &hints, &broadcast_addr)) == -1) {
-        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
-        exit(2);
-    } 
+    get_local_addr(&local_addr, &local_length);
 
-    if (bind(udp_listen_socket, broadcast_addr->ai_addr, broadcast_addr->ai_addrlen) == -1) {
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = htons(UDP_BROADCAST_PORT);
+    inet_aton(BROADCAST_ADDR, &broadcast_addr.sin_addr);
+
+    if (bind(udp_listen_socket, (struct sockaddr *)&broadcast_addr, length) == -1) {
         fprintf(stderr, "Failed to bind socket for client requests: %s\n", strerror(errno));
         exit(3);
     }
@@ -116,6 +118,7 @@ void *listen_new_clients(void *client_name)
             fprintf(stderr, "Failed to receive request from client: %s\n", strerror(errno));
             exit(1);
         }
+        printf("Установка подключения к %s\n", request.nickname);
         // Как только получили запрос, сразу же создаем все условия
         req_tcp_socket = create_tcp_client_socket();
 
@@ -148,7 +151,7 @@ void *listen_new_clients(void *client_name)
         response.port = ipv4->sin_port;
         strcpy(response.nickname, (char *)client_name);
         char ip_str[INET_ADDRSTRLEN];
-        inet_ntop(ipv4->sin_family, &ipv4->sin_addr, ip_str, sizeof(ip_str));
+        inet_ntop(local_addr.sin_family, &local_addr, ip_str, sizeof(ip_str));
 
         listen(req_tcp_socket, 1);
         // Тут есть вероятность, что подключаемый клиент отправит запрос раньше, чем дело
@@ -161,7 +164,6 @@ void *listen_new_clients(void *client_name)
     }
    
     close(udp_listen_socket);
-    freeaddrinfo(broadcast_addr);
     return NULL;
 }
 
