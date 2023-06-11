@@ -150,11 +150,11 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = 0;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
 
     // Для нового клиента выхватываем первый попавшийся пустой порт
-    if((status = getaddrinfo(data->address, NULL, &hints, &client_addr)) != 0) {
+    if((status = getaddrinfo(data->address, NULL, &hints, &client_addr)) < 0) {
         fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
         return -1;
     }
@@ -166,7 +166,8 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
     struct sockaddr_in *clietn_ipv4 = (struct sockaddr_in *)client_addr->ai_addr;
     clietn_ipv4->sin_port = htons(data->port);
 
-    if(connect(new_tcp_client_socket, client_addr->ai_addr, client_addr->ai_addrlen) != 0) {
+    sleep(2);
+    if(connect(new_tcp_client_socket, (struct sockaddr *)clietn_ipv4, client_addr->ai_addrlen) < 0) {
         fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
         return -1;
     }
@@ -175,6 +176,8 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
         fprintf(stderr, "Failed to add new client %s\n", data->nickname);
         return -1;
     }
+
+    printf("Клиент %s успешно подключен", data->nickname);
     freeaddrinfo(client_addr);
 
     return new_tcp_client_socket;

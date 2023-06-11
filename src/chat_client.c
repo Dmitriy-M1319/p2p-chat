@@ -132,6 +132,8 @@ void *listen_new_clients(void *client_name)
             exit(1);
         }
 
+        puts("Привязка сокета");
+
         struct query_datagramm response;
         struct sockaddr_in servaddr;
         socklen_t len = sizeof(servaddr);
@@ -145,9 +147,14 @@ void *listen_new_clients(void *client_name)
         inet_ntop(local_addr.sin_family, &local_addr, response.address, INET_ADDRSTRLEN);
 
         listen(req_tcp_socket, 1);
+        puts("Прослушивание сокета");
+
         // Тут есть вероятность, что подключаемый клиент отправит запрос раньше, чем дело дойдет до accept
         send_connection_response(udp_listen_socket, (struct sockaddr *)&client_req, &response);
+
         int new_tcp_sock = accept(req_tcp_socket, NULL, NULL);
+        puts("accept пройден");
+
         if (add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req) == -1) {
             fprintf(stderr, "Failed to add new client %s\n", request.nickname);
             exit(1);
