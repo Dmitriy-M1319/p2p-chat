@@ -21,6 +21,11 @@ typedef struct client_connection_node client_connection;
 client_connection *create_client_list();
 
 /**
+ * Печатает список подключений в вывод
+ */
+void print_list(client_connection *list);
+
+/**
  * Добавить новое подключение в список подключений
  * Возвращает -1 в результате ошибки создания нового элемента
  */

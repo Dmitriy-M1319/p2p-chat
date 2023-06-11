@@ -139,21 +139,21 @@ void *listen_new_clients(void *client_name)
         struct sockaddr_in servaddr;
         socklen_t len = sizeof(servaddr);
 
+        if(listen(req_tcp_socket, 2) < 0) {
+            fprintf(stderr, "Failed to listen the TCP client socket: %s\n", strerror(errno));
+            exit(1);
+        }
+        puts("Прослушивание сокета");
+
         if (getsockname(req_tcp_socket, (struct sockaddr*)&servaddr, &len) < 0) {
             perror("getsockname error");
             exit(1);
         }
-        response.port = servaddr.sin_port; // порт, который был открыт для нового подключения
+
+        response.port = ntohs(servaddr.sin_port); // порт, который был открыт для нового подключения
         strcpy(response.nickname, (char *)client_name);
         inet_ntop(local_addr.sin_family, &(local_addr.sin_addr), response.address, sizeof(response.address));
 
-        puts(response.address);
-        printf("%d\n", response.port);
-
-        listen(req_tcp_socket, 2);
-        puts("Прослушивание сокета");
-
-        // Тут есть вероятность, что подключаемый клиент отправит запрос раньше, чем дело дойдет до accept
         send_connection_response(udp_listen_socket, (struct sockaddr *)&client_req, &response);
         puts("Отправка прошла");
 
@@ -165,7 +165,7 @@ void *listen_new_clients(void *client_name)
             exit(1);
         };
         printf("Подключение к %s было установлено\n", request.nickname);
-        close(req_tcp_socket);
+        print_list(connections);
     }
    
     close(udp_listen_socket);

@@ -1,4 +1,7 @@
 #include "connection_list.h"
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -17,6 +20,23 @@ struct client_connection_node *create_client_list()
     strncpy(head->client_name, " ", CLIENT_NAME_MAX_LENGTH);
     head->client_socket = -1;
     return head;
+}
+
+void print_list(client_connection *list)
+{
+    struct client_connection_node *tmp = list;
+    while (tmp != NULL) {
+        if (tmp->client_socket != -1) {
+            printf("Connection: %s\n", tmp->client_name);
+            char addr[INET_ADDRSTRLEN];
+            inet_ntop(tmp->client_address_info.sin_family, 
+                    &tmp->client_address_info.sin_addr, addr, INET_ADDRSTRLEN);
+            printf("IPv4: %s:%d\n", addr, ntohs(tmp->client_address_info.sin_port));
+            puts("");
+
+        }
+        tmp = tmp->next;
+    }
 }
 
 

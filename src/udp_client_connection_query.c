@@ -146,19 +146,19 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
 {
     int status, new_tcp_client_socket;
     struct sockaddr_in client_addr;
+    socklen_t length = sizeof(client_addr);
 
     printf("Получен ответ на запрос подключения от %s\n", data->nickname);
 
-    new_tcp_client_socket = socket(PF_INET, 
-            SOCK_STREAM, 
-            IPPROTO_TCP);
-
+    new_tcp_client_socket = create_tcp_client_socket();
     client_addr.sin_port = htons(data->port);
     client_addr.sin_family = AF_INET;
     inet_aton(data->address, &(client_addr.sin_addr));
+    puts(data->address);
+    printf("%d\n", data->port);
 
-    sleep(2);
-    if(connect(new_tcp_client_socket, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
+    sleep(3);
+    if(connect(new_tcp_client_socket, (struct sockaddr *)&client_addr, length) < 0) {
         fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
         return -1;
     }
