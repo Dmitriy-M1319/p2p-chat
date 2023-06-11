@@ -88,7 +88,6 @@ int get_local_addr(struct sockaddr_in *addr_out, socklen_t *length)
         return -1;
     }
 
-    puts(hostname);
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;

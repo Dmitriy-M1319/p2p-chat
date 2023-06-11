@@ -6,13 +6,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-struct client_connection_node
-{
-    char client_name[CLIENT_NAME_MAX_LENGTH];
-    int client_socket;
-    struct sockaddr_in client_address_info;
-    struct client_connection_node *next;
-};
 
 struct client_connection_node *create_client_list()
 {

@@ -14,6 +14,14 @@
 
 typedef struct client_connection_node client_connection;
 
+struct client_connection_node
+{
+    char client_name[CLIENT_NAME_MAX_LENGTH];
+    int client_socket;
+    struct sockaddr_in client_address_info;
+    struct client_connection_node *next;
+};
+
 /**
  * Создает новый пустой односвязный список
  * Возвращает -1 в результате ошибки иниациализации списка

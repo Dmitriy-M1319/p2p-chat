@@ -1,5 +1,6 @@
 #include "udp_client_connection_query.h"
 #include "connection_list.h"
+#include "messenger.h"
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -11,7 +12,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <signal.h>
 
 // Список всех подключений для клиентов в локальной сети
 client_connection *connections = NULL;
@@ -23,6 +24,19 @@ struct thread_args
     struct query_datagramm *data;
     client_connection *connection_list;
 };
+
+// Обработчик завершающего сигнала, который очищает все ресурсы программы и закрывает сокеты
+void kill_program_handler(int sig)
+{
+    // Здесь сделать дополнительное отсоединение от других клиентов
+    puts("убився");
+    free_connection_list(connections);
+    long max = sysconf(_SC_OPEN_MAX);
+
+    while (--max >= 0)
+        close(max);
+    kill(0, SIGTERM);
+}
 
 
 void *thread_connection(void *args)
@@ -133,8 +147,6 @@ void *listen_new_clients(void *client_name)
             exit(1);
         }
 
-        puts("Привязка сокета");
-
         struct query_datagramm response;
         struct sockaddr_in servaddr;
         socklen_t len = sizeof(servaddr);
@@ -143,7 +155,6 @@ void *listen_new_clients(void *client_name)
             fprintf(stderr, "Failed to listen the TCP client socket: %s\n", strerror(errno));
             exit(1);
         }
-        puts("Прослушивание сокета");
 
         if (getsockname(req_tcp_socket, (struct sockaddr*)&servaddr, &len) < 0) {
             perror("getsockname error");
@@ -155,10 +166,7 @@ void *listen_new_clients(void *client_name)
         inet_ntop(local_addr.sin_family, &(local_addr.sin_addr), response.address, sizeof(response.address));
 
         send_connection_response(udp_listen_socket, (struct sockaddr *)&client_req, &response);
-        puts("Отправка прошла");
-
         int new_tcp_sock = accept(req_tcp_socket, NULL, NULL);
-        puts("accept пройден");
 
         if (add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req) == -1) {
             fprintf(stderr, "Failed to add new client %s\n", request.nickname);
@@ -170,6 +178,12 @@ void *listen_new_clients(void *client_name)
    
     close(udp_listen_socket);
     return NULL;
+}
+
+void print_menu()
+{
+    puts("Выберите действие:");
+    puts("1. Выйти из чата");
 }
 
 
@@ -186,15 +200,37 @@ int main(int argc, char *argv[])
         nickname[i] = (char)ch;
         ++i;
     } 
+
+    if (signal(SIGINT, kill_program_handler) == SIG_ERR) {
+        fprintf(stderr, "Failed to set new handler to signal kill program: %s\n" , strerror(errno));
+        exit(1);
+    }
+
     printf("Подключение к сети...\n");
     query_invitation_in_network(nickname);
 
-    // Отдельный поток
     pthread_t listen_th;
     if (pthread_create(&listen_th, NULL, listen_new_clients, nickname) != 0) {
         fprintf(stderr, "Failed to create new thread for listening: %s\n" , strerror(errno));
         exit(1);
     }
+
+    // как то продумать этот момент
+    int cycle = 1;
+    while (cycle) {
+        print_menu();
+        printf(">> ");
+        int var = 1;
+        scanf("%d", &var);
+        switch (var) {
+            case 1:
+               unconnect(connections, nickname);
+               pthread_kill(listen_th, SIGINT);
+               cycle = 0;
+               break;
+        }
+    }
+
 
     void *res;
     pthread_join(listen_th, &res);
