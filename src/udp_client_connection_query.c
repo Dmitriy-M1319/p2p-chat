@@ -88,6 +88,7 @@ int get_local_addr(struct sockaddr_in *addr_out, socklen_t *length)
         return -1;
     }
 
+    puts(hostname);
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -144,41 +145,29 @@ int send_connection_response(int udp_socket, struct sockaddr *client_info, struc
 int create_client_connection(struct query_datagramm *data, client_connection *connections)
 {
     int status, new_tcp_client_socket;
-    struct addrinfo hints, *client_addr;
+    struct sockaddr_in client_addr;
 
     printf("Получен ответ на запрос подключения от %s\n", data->nickname);
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
+    new_tcp_client_socket = socket(PF_INET, 
+            SOCK_STREAM, 
+            IPPROTO_TCP);
 
-    // Для нового клиента выхватываем первый попавшийся пустой порт
-    if((status = getaddrinfo(data->address, NULL, &hints, &client_addr)) < 0) {
-        fprintf(stderr, "Error with getaddrinfo: %s\n", gai_strerror(status));
-        return -1;
-    }
-
-    new_tcp_client_socket = socket(client_addr->ai_family, 
-            client_addr->ai_socktype, 
-            client_addr->ai_protocol);
-
-    struct sockaddr_in *clietn_ipv4 = (struct sockaddr_in *)client_addr->ai_addr;
-    clietn_ipv4->sin_port = htons(data->port);
+    client_addr.sin_port = htons(data->port);
+    client_addr.sin_family = AF_INET;
+    inet_aton(data->address, &(client_addr.sin_addr));
 
     sleep(2);
-    if(connect(new_tcp_client_socket, (struct sockaddr *)clietn_ipv4, client_addr->ai_addrlen) < 0) {
+    if(connect(new_tcp_client_socket, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
         fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
         return -1;
     }
 
-    if(add_new_connection(connections, data->nickname, new_tcp_client_socket, clietn_ipv4) == -1) {
+    if(add_new_connection(connections, data->nickname, new_tcp_client_socket, &client_addr) == -1) {
         fprintf(stderr, "Failed to add new client %s\n", data->nickname);
         return -1;
     }
 
     printf("Клиент %s успешно подключен", data->nickname);
-    freeaddrinfo(client_addr);
-
     return new_tcp_client_socket;
 }

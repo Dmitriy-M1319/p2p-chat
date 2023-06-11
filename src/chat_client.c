@@ -37,6 +37,7 @@ void *thread_connection(void *args)
         fprintf(stderr, "Failed to create new connection to client\n");
         exit(2);
     }
+    pthread_mutex_unlock(&mut);
     return NULL;
 }
 
@@ -144,13 +145,17 @@ void *listen_new_clients(void *client_name)
         }
         response.port = servaddr.sin_port; // порт, который был открыт для нового подключения
         strcpy(response.nickname, (char *)client_name);
-        inet_ntop(local_addr.sin_family, &local_addr, response.address, INET_ADDRSTRLEN);
+        inet_ntop(local_addr.sin_family, &(local_addr.sin_addr), response.address, sizeof(response.address));
 
-        listen(req_tcp_socket, 1);
+        puts(response.address);
+        printf("%d\n", response.port);
+
+        listen(req_tcp_socket, 2);
         puts("Прослушивание сокета");
 
         // Тут есть вероятность, что подключаемый клиент отправит запрос раньше, чем дело дойдет до accept
         send_connection_response(udp_listen_socket, (struct sockaddr *)&client_req, &response);
+        puts("Отправка прошла");
 
         int new_tcp_sock = accept(req_tcp_socket, NULL, NULL);
         puts("accept пройден");
