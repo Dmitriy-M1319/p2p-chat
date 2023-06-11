@@ -62,7 +62,7 @@ int send_connection_query(int udp_socket, const char *nickname)
     struct query_datagramm dgram;
     dgram.port = 0;
     strncpy(dgram.msg, CONNECTION_UDP_REQUEST, sizeof(CONNECTION_UDP_REQUEST));
-    strcpy(dgram.nickname, nickname);
+    strncpy(dgram.nickname, nickname, DATAGRAM_NICKNAME_LENGTH);
 
     if (sendto(udp_socket, &dgram, sizeof(dgram), 0, (struct sockaddr *)&local_client, length) == -1) {
         fprintf(stderr, "Failed to send query for invitation in network: %s\n", strerror(errno));
@@ -113,7 +113,7 @@ int get_local_addr(struct sockaddr_in *addr_out, socklen_t *length)
 
 int create_tcp_client_socket()
 {
-    int sock, status;
+    int sock;
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
         fprintf(stderr, "Failed to create TCP socket for new client: %s\n", strerror(errno));
         return -1;

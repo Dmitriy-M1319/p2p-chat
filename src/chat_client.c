@@ -8,7 +8,6 @@
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -16,17 +15,38 @@
 
 // Список всех подключений для клиентов в локальной сети
 client_connection *connections = NULL;
+// Мьютекс для защиты списка подключений от работы нескольких потоков
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
 
+struct thread_args
+{
+    struct query_datagramm *data;
+    client_connection *connection_list;
+};
+
+void *thread_connection(void *args)
+{
+    struct thread_args *elements = (struct thread_args *)args;
+    int s = pthread_mutex_lock(&mut);
+    if (s != 0) {
+        fprintf(stderr, "Failed to lock connection list\n");
+        exit(1);
+    }
+    if(create_client_connection(elements->data, elements->connection_list) == -1) {
+        fprintf(stderr, "Failed to create new connection to client\n");
+        exit(2);
+    }
+    return NULL;
+}
 
 void query_invitation_in_network(const char *client_name)
 {
     int query_socket;
-    struct sockaddr_in info;
-
     // Создаем сокет для широковещательного запроса в сеть
     if ((query_socket = create_udb_broadcast_socket()) < 0) {
         exit(1);
     }
+    puts(client_name);
     // Отправляем широковещательный запрос
     if (send_connection_query(query_socket, client_name) == -1) {
         exit(2);
@@ -35,7 +55,6 @@ void query_invitation_in_network(const char *client_name)
     struct query_datagramm data;
     struct sockaddr addr;
     socklen_t addr_len;
-    int new_cl_socket;
     connections = create_client_list();
 
     // Ждем получения ответа от других клиентов чата
@@ -43,6 +62,8 @@ void query_invitation_in_network(const char *client_name)
         if (recvfrom(query_socket, &data, sizeof(data), 0, &addr, &addr_len) == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN) {
                 // Ответа нет: или мы первые в сети, или подключились ко всем клиентам
+                puts("Кто то в сети первый");
+                close(query_socket);
                 break;
             }
             else {
@@ -52,17 +73,17 @@ void query_invitation_in_network(const char *client_name)
         }
 
         pthread_t new_thread;
-    
-        // Создаем новое подключение с клиентом в отдельном потоке
-        if(create_client_connection(&data, connections) == -1) {
-            fprintf(stderr, "Failed to create new connection to client\n");
-            exit(3);
-        }
+        struct thread_args args = { &data, connections };
+
+        if (pthread_create(&new_thread, NULL, thread_connection, &args) != 0) {
+            fprintf(stderr, "Failed to create a new thread for create connection: %s\n", strerror(errno));
+            exit(1);
+        } 
     }
 }
 
 
-void listen_new_clients(const char *client_name)
+void *listen_new_clients(void *client_name)
 {
     // вот эта вещь тоже должна наверное висеть в отдельном потоке 
     int udp_listen_socket, status;
@@ -86,9 +107,8 @@ void listen_new_clients(const char *client_name)
         exit(3);
     }
 
-    freeaddrinfo(broadcast_addr);
 
-    // Теперь ждем входящих запросов 
+    // Теперь ждем входящих запросов (сделать завершение прослушивания через сигналы)
     while (1) {
         struct query_datagramm request; 
         int req_tcp_socket;
@@ -126,7 +146,7 @@ void listen_new_clients(const char *client_name)
         struct query_datagramm response;
         struct sockaddr_in *ipv4 = (struct sockaddr_in *)client_req;
         response.port = ipv4->sin_port;
-        strcpy(response.nickname, client_name);
+        strcpy(response.nickname, (char *)client_name);
         char ip_str[INET_ADDRSTRLEN];
         inet_ntop(ipv4->sin_family, &ipv4->sin_addr, ip_str, sizeof(ip_str));
 
@@ -139,24 +159,40 @@ void listen_new_clients(const char *client_name)
         freeaddrinfo(client_req);
         close(req_tcp_socket);
     }
-    
+   
+    close(udp_listen_socket);
+    freeaddrinfo(broadcast_addr);
+    return NULL;
 }
 
 
 int main(int argc, char *argv[])
 {
     char nickname[DATAGRAM_NICKNAME_LENGTH];
-    char ch;
+    int ch;
+    int i = 0;
     printf("Hello, I am future chat client...\n");
     printf("Введите имя, под которым вы будете видны остальным участникам: ");
-    for (int i = 0; (ch = getchar()) != EOF; i++) {
-        nickname[i] = ch;
+    while((ch = getchar()) != EOF) {
+        if (ch == '\n')
+            break;
+        nickname[i] = (char)ch;
+        ++i;
     } 
     printf("Подключение к сети...\n");
     query_invitation_in_network(nickname);
 
     // Отдельный поток
-    listen_new_clients(nickname);
+    pthread_t listen_th;
+    if (pthread_create(&listen_th, NULL, listen_new_clients, nickname) != 0) {
+        fprintf(stderr, "Failed to create new thread for listening: %s\n" , strerror(errno));
+        exit(1);
+    }
 
+    void *res;
+    pthread_join(listen_th, &res);
+    printf("Listen thread return %ld\n", (long)res);
+
+    free_connection_list(connections);
     return 0;
 }
