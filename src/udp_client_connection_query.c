@@ -161,12 +161,15 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
             client_addr->ai_socktype, 
             client_addr->ai_protocol);
 
+    struct sockaddr_in *clietn_ipv4 = (struct sockaddr_in *)client_addr->ai_addr;
+    clietn_ipv4->sin_port = htons(data->port);
+
     if(connect(new_tcp_client_socket, client_addr->ai_addr, client_addr->ai_addrlen) != 0) {
         fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
         return -1;
     }
 
-    add_new_connection(connections, data->nickname, new_tcp_client_socket, (struct sockaddr_in *)client_addr->ai_addr);
+    add_new_connection(connections, data->nickname, new_tcp_client_socket, clietn_ipv4);
     freeaddrinfo(client_addr);
 
     return new_tcp_client_socket;
