@@ -146,6 +146,8 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
     int status, new_tcp_client_socket;
     struct addrinfo hints, *client_addr;
 
+    printf("Получен ответ на запрос подключения от %s\n", data->nickname);
+
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
@@ -169,7 +171,10 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
         return -1;
     }
 
-    add_new_connection(connections, data->nickname, new_tcp_client_socket, clietn_ipv4);
+    if(add_new_connection(connections, data->nickname, new_tcp_client_socket, clietn_ipv4) == -1) {
+        fprintf(stderr, "Failed to add new client %s\n", data->nickname);
+        return -1;
+    }
     freeaddrinfo(client_addr);
 
     return new_tcp_client_socket;

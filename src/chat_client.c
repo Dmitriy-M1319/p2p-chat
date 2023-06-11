@@ -114,8 +114,11 @@ void *listen_new_clients(void *client_name)
     while (1) {
         struct query_datagramm request; 
         int req_tcp_socket;
-        struct sockaddr client_req;
-        if(recvfrom(udp_listen_socket, &request, sizeof(request), 0, &client_req, NULL) == -1) {
+        struct sockaddr_in client_req;
+        socklen_t client_length = sizeof(client_req);
+        if(recvfrom(udp_listen_socket, 
+                    &request, sizeof(request), 0, 
+                    (struct sockaddr *)&client_req, &client_length) == -1) {
             fprintf(stderr, "Failed to receive request from client: %s\n", strerror(errno));
             exit(1);
         }
@@ -143,9 +146,13 @@ void *listen_new_clients(void *client_name)
 
         listen(req_tcp_socket, 1);
         // Тут есть вероятность, что подключаемый клиент отправит запрос раньше, чем дело дойдет до accept
-        send_connection_response(udp_listen_socket, &client_req, &response);
+        send_connection_response(udp_listen_socket, (struct sockaddr *)&client_req, &response);
         int new_tcp_sock = accept(req_tcp_socket, NULL, NULL);
-        add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req);
+        if (add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req) == -1) {
+            fprintf(stderr, "Failed to add new client %s\n", request.nickname);
+            exit(1);
+        };
+        printf("Подключение к %s было установлено\n", request.nickname);
         close(req_tcp_socket);
     }
    
