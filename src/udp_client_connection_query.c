@@ -162,7 +162,7 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
         return -1;
     }
 
-    if(add_new_connection(connections, data->nickname, new_tcp_client_socket, &client_addr) == -1) {
+    if(!add_new_connection(connections, data->nickname, new_tcp_client_socket, &client_addr)) {
         fprintf(stderr, "Failed to add new client %s\n", data->nickname);
         return -1;
     }

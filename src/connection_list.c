@@ -33,10 +33,10 @@ void print_list(client_connection *list)
 }
 
 
-int add_new_connection(struct client_connection_node *list, const char *name, int socket, const struct sockaddr_in *addr)
+client_connection *add_new_connection(struct client_connection_node *list, const char *name, int socket, const struct sockaddr_in *addr)
 {
     if (list == NULL) {
-        return -1;
+        return NULL;
     }
     struct client_connection_node *tmp = list;
     while (tmp->next != NULL) {
@@ -44,14 +44,14 @@ int add_new_connection(struct client_connection_node *list, const char *name, in
     }
 
     if((tmp->next = (struct client_connection_node *)malloc(sizeof(struct client_connection_node))) == NULL ) {
-        return -1;
+        return NULL;
     }
 
     strncpy(tmp->next->client_name, name, CLIENT_NAME_MAX_LENGTH);
     tmp->next->client_socket = socket;
     memcpy(&tmp->next->client_address_info, addr, sizeof(struct sockaddr_in));
 
-    return 0;
+    return tmp->next;
 }
 
 

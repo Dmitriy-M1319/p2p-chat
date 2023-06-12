@@ -85,7 +85,7 @@ int send_file(client_connection *list, const char *filename, const char *receive
     }
 
     file_part.type = FILE_MSG;
-    strncpy(file_part.filename, filename, CLIENT_NAME_MAX_LENGTH);
+    strncpy(file_part.filename, filename, MESSAGE_MAX_LENGTH);
 
     if (stat(filename, &file_stat) < 0) {
         fprintf(stderr, "Failed to get information by file\n");

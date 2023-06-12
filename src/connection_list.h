@@ -35,9 +35,9 @@ void print_list(client_connection *list);
 
 /**
  * Добавить новое подключение в список подключений
- * Возвращает -1 в результате ошибки создания нового элемента
+ * Возвращает ссылку на созданный объект
  */
-int add_new_connection(client_connection *list, const char *name, int socket, const struct sockaddr_in *addr);
+client_connection *add_new_connection(client_connection *list, const char *name, int socket, const struct sockaddr_in *addr);
 
 /**
  * Получить указатель на узел подключения для определенного имени клиента

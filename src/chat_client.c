@@ -210,12 +210,21 @@ void *listen_new_clients(void *client_name)
         send_connection_response(udp_listen_socket, (struct sockaddr *)&client_req, &response);
         int new_tcp_sock = accept(req_tcp_socket, NULL, NULL);
 
-        if (add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req) == -1) {
+        client_connection *new_client;
+
+        if (!(new_client = add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req))) {
             fprintf(stderr, "Failed to add new client %s\n", request.nickname);
             exit(1);
         };
         printf("Подключение к %s было установлено\n", request.nickname);
-        print_list(connections);
+        pthread_t connection_th;
+        struct receive_msg_args args;
+        args.curr_client = new_client;
+        args.list = connections;
+        if (pthread_create(&connection_th, NULL, receive_msg, (void *)&args) < 0) {
+            fprintf(stderr, "Failed to start new thread for connection with %s\n", request.nickname);
+            exit(1);
+        }
     }
    
     close(udp_listen_socket);
@@ -273,7 +282,6 @@ int main(int argc, char *argv[])
                break;
         }
     }
-
 
     void *res;
     pthread_join(listen_th, &res);
