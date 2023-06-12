@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -Wall -Wextra -pedantic
+CFLAGS = -g -Wall -Wextra -pedantic -pthread
 
 p2p-chat: connection_list.o udp_client_connection_query.o messenger.o src/chat_client.c
 	$(CC) $(CFLAGS) connection_list.o udp_client_connection_query.o src/chat_client.c -o bin/chat_client

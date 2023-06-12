@@ -61,7 +61,7 @@ struct client_connection_node *get_client_info(struct client_connection_node *li
         return NULL;
     }
     struct client_connection_node *tmp = list;
-    while (tmp->next != NULL || strncmp(tmp->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
+    while (tmp != NULL || strncmp(tmp->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
         tmp = tmp->next;
     }
 
