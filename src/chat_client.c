@@ -7,12 +7,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 // Список всех подключений для клиентов в локальной сети
 client_connection *connections = NULL;
@@ -49,6 +51,7 @@ void *receive_msg(void *data)
     int bytes_read;
     client_msg message; 
     char removed_user[CLIENT_NAME_MAX_LENGTH];
+    int received_file_fd = 0;
     while (1) {
         if ((bytes_read = recv(args->curr_client->client_socket, &message, sizeof(message), 0)) < 0) {
             fprintf(stderr, "Failed to receive message from client: %s\n", strerror(errno));
@@ -75,6 +78,17 @@ void *receive_msg(void *data)
                 pthread_mutex_unlock(&print_mut);
                 return NULL;
             case FILE_MSG:
+                if (!received_file_fd) {
+                    received_file_fd = open(message.filename, O_CREAT | O_RDONLY, 0666);
+                    write(received_file_fd, message.msg, bytes_read);
+                } else {
+                    if (bytes_read != 0) {
+                        write(received_file_fd, message.msg, bytes_read);
+                    } else {
+                        close(received_file_fd);
+                        printf("От пользователя %s получен файл %s\n", args->curr_client->client_name, message.filename);
+                    }
+                }
                 break;
         } 
     }
