@@ -8,6 +8,12 @@
 
 typedef struct client_message client_msg;
 
+struct receive_msg_args
+{
+    client_connection *list;
+    client_connection *curr_client;
+};
+
 /**
  * Тип сообщения (для всех клиентов, для определенного клиента, для файла для отключения от сети)
  */
@@ -19,12 +25,19 @@ enum msg_type
     UNCONNECT_MSG
 };
 
+struct client_message 
+{
+    enum msg_type type;
+    char filename[MESSAGE_MAX_LENGTH];
+    int size;
+    char msg[MESSAGE_MAX_LENGTH];
+};
+
 /**
  * Отсоединиться ото всех участников чата
  * При ошибке возвращает -1
  */
 int unconnect(client_connection *list);
-
 
 /**
  * Отправляет обычное текстовое сообщение всем или определенному пользователю

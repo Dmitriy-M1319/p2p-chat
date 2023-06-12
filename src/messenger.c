@@ -11,17 +11,6 @@
 #include <unistd.h>
 
 
-// Структура, которая будет передаваться по каналам между клиентами
-// для сообщений
-struct client_message 
-{
-    enum msg_type type;
-    char filename[MESSAGE_MAX_LENGTH];
-    int size;
-    char msg[MESSAGE_MAX_LENGTH];
-};
-
-
 int unconnect(client_connection *list)
 {
     if (list == NULL) {
@@ -119,5 +108,4 @@ int send_file(client_connection *list, const char *filename, const char *receive
 
     close(file_fd);
     return 0;
-    
 }

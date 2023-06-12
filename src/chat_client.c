@@ -18,12 +18,16 @@
 client_connection *connections = NULL;
 // Мьютекс для защиты списка подключений от работы нескольких потоков
 pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
+// Мьютекс для вывода сообщений на экран пользователю
+pthread_mutex_t print_mut = PTHREAD_MUTEX_INITIALIZER;
+
 
 struct thread_args
 {
     struct query_datagramm *data;
     client_connection *connection_list;
 };
+
 
 // Обработчик завершающего сигнала, который очищает все ресурсы программы и закрывает сокеты
 void kill_program_handler(int sig)
@@ -36,6 +40,45 @@ void kill_program_handler(int sig)
     while (--max >= 0)
         close(max);
     kill(0, SIGTERM);
+}
+
+
+void *receive_msg(void *data)
+{
+    struct receive_msg_args *args = (struct receive_msg_args *)data;
+    int bytes_read;
+    client_msg message; 
+    char removed_user[CLIENT_NAME_MAX_LENGTH];
+    while (1) {
+        if ((bytes_read = recv(args->curr_client->client_socket, &message, sizeof(message), 0)) < 0) {
+            fprintf(stderr, "Failed to receive message from client: %s\n", strerror(errno));
+            return NULL;
+        }
+        switch (message.type) {
+            case ALL_CLIENTS_MSG:
+                pthread_mutex_lock(&print_mut);
+                printf("Всем от %s: %s\n", args->curr_client->client_name, message.msg);
+                pthread_mutex_unlock(&print_mut);
+                break;
+            case PRIVATE_MSG:
+                pthread_mutex_lock(&print_mut);
+                printf("Лично Вам от %s: %s\n", args->curr_client->client_name, message.msg);
+                pthread_mutex_unlock(&print_mut);
+                break;
+            case UNCONNECT_MSG:
+                strncpy(removed_user, args->curr_client->client_name, CLIENT_NAME_MAX_LENGTH);
+                pthread_mutex_lock(&mut);
+                remove_connection(args->list, args->curr_client->client_name);
+                pthread_mutex_unlock(&mut);
+                pthread_mutex_lock(&print_mut);
+                printf("Пользователь %s покинул чат\n", removed_user);
+                pthread_mutex_unlock(&print_mut);
+                return NULL;
+            case FILE_MSG:
+                break;
+        } 
+    }
+    return NULL;
 }
 
 
@@ -102,7 +145,6 @@ void query_invitation_in_network(const char *client_name)
 
 void *listen_new_clients(void *client_name)
 {
-    // вот эта вещь тоже должна наверное висеть в отдельном потоке 
     int udp_listen_socket, status;
     struct sockaddr_in broadcast_addr, local_addr;
     socklen_t length = sizeof(broadcast_addr);
@@ -180,6 +222,7 @@ void *listen_new_clients(void *client_name)
     return NULL;
 }
 
+
 void print_menu()
 {
     puts("Выберите действие:");
@@ -224,7 +267,7 @@ int main(int argc, char *argv[])
         scanf("%d", &var);
         switch (var) {
             case 1:
-               unconnect(connections, nickname);
+               unconnect(connections);
                pthread_kill(listen_th, SIGINT);
                cycle = 0;
                break;
