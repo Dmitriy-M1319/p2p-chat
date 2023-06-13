@@ -84,7 +84,8 @@ void *receive_msg(void *data)
                     received_file_fd = open(message.filename, O_CREAT | O_APPEND, 0666);
                     write(received_file_fd, message.msg, MESSAGE_MAX_LENGTH);
                 } else {
-                    if (bytes_read - (sizeof( enum msg_type) + MESSAGE_MAX_LENGTH + sizeof(int)) > 0) {
+                    int header_size = sizeof(enum msg_type) + sizeof(char) * MESSAGE_MAX_LENGTH + sizeof(int);
+                    if (bytes_read - header_size > 0) {
                         write(received_file_fd, message.msg, MESSAGE_MAX_LENGTH);
                     } else {
                         close(received_file_fd);
@@ -209,7 +210,7 @@ void *listen_new_clients(void *client_name)
         struct sockaddr_in servaddr;
         socklen_t len = sizeof(servaddr);
 
-        if(listen(req_tcp_socket, 2) < 0) {
+        if(listen(req_tcp_socket, 1) < 0) {
             fprintf(stderr, "Failed to listen the TCP client socket: %s\n", strerror(errno));
             exit(1);
         }
@@ -250,7 +251,7 @@ void *listen_new_clients(void *client_name)
 
 void parse_chat_command(char *message)
 {
-    char delim[] = "/\"";
+    char delim[] = "|\"";
     char *user = NULL, *msg_or_filename;
     char *start = strtok(message, delim);
     if (strstr(start, ":send_msg")) {
