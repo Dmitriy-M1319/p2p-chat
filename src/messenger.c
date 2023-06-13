@@ -29,6 +29,7 @@ int unconnect(client_connection *list)
                 return -1;
             }
         }
+        tmp = tmp->next;
     }
     
     return 0;
@@ -45,10 +46,12 @@ int send_msg(client_connection *list, const char *receiver, const char *msg)
         // Отправляем сообщение всем клиентам
         client_connection *tmp = list;
         while (tmp != NULL) {
-            if (send(tmp->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
-                fprintf(stderr, "Failed to send a message for clients: %s\n", strerror(errno));
-                return -1;
-            } 
+            if (tmp->client_socket != -1) {
+                if (send(tmp->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
+                    fprintf(stderr, "Failed to send a message for clients: %s\n", strerror(errno));
+                    return -1;
+                }
+            }
             tmp = tmp->next;
         }
     } else {

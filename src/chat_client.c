@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <errno.h>
 #include <unistd.h>
@@ -15,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
 
 // Список всех подключений для клиентов в локальной сети
 client_connection *connections = NULL;
@@ -79,14 +81,14 @@ void *receive_msg(void *data)
                 return NULL;
             case FILE_MSG:
                 if (!received_file_fd) {
-                    received_file_fd = open(message.filename, O_CREAT | O_RDONLY, 0666);
-                    write(received_file_fd, message.msg, bytes_read);
+                    received_file_fd = open(message.filename, O_CREAT | O_APPEND, 0666);
+                    write(received_file_fd, message.msg, MESSAGE_MAX_LENGTH);
                 } else {
-                    if (bytes_read != 0) {
-                        write(received_file_fd, message.msg, bytes_read);
+                    if (bytes_read - (sizeof( enum msg_type) + MESSAGE_MAX_LENGTH + sizeof(int)) > 0) {
+                        write(received_file_fd, message.msg, MESSAGE_MAX_LENGTH);
                     } else {
                         close(received_file_fd);
-                        printf("От пользователя %s получен файл %s\n", args->curr_client->client_name, message.filename);
+                        printf("Пользователь %s отправил вам файл %s\n", args->curr_client->client_name, message.filename);
                     }
                 }
                 break;
@@ -128,7 +130,7 @@ void query_invitation_in_network(const char *client_name)
 
     struct query_datagramm data;
     struct sockaddr addr;
-    socklen_t addr_len;
+    socklen_t addr_len = sizeof(addr);
     connections = create_client_list();
 
     // Ждем получения ответа от других клиентов чата
@@ -246,10 +248,35 @@ void *listen_new_clients(void *client_name)
 }
 
 
-void print_menu()
+void parse_chat_command(char *message)
 {
-    puts("Выберите действие:");
-    puts("1. Выйти из чата");
+    char delim[] = "/\"";
+    char *user = NULL, *msg_or_filename;
+    char *start = strtok(message, delim);
+    if (strstr(start, ":send_msg")) {
+        msg_or_filename = strtok(NULL, delim);
+        pthread_mutex_lock(&print_mut);
+        send_msg(connections, user, msg_or_filename);
+        printf("Вы: %s\n", msg_or_filename);
+        pthread_mutex_unlock(&print_mut);
+    } else if (strstr(start, ":send_to")) {
+        user = strtok(NULL, delim);
+        msg_or_filename = strtok(NULL, delim);
+        pthread_mutex_lock(&print_mut);
+        send_msg(connections, user, msg_or_filename);
+        printf("Вы: %s\n", msg_or_filename);
+        pthread_mutex_unlock(&print_mut);
+    } else if (strstr(start, ":send_file")) {
+        user = strtok(NULL, delim);
+        msg_or_filename = strtok(NULL, delim);
+        pthread_mutex_lock(&print_mut);
+        send_file(connections, msg_or_filename, user);
+        printf("Отправлен файл: %s\n", msg_or_filename);
+        pthread_mutex_unlock(&print_mut);
+    } else {
+        unconnect(connections);
+        kill(getpid(), SIGINT);
+    }
 }
 
 
@@ -281,20 +308,18 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    // как то продумать этот момент
-    int cycle = 1;
-    while (cycle) {
-        print_menu();
-        printf(">> ");
-        int var = 1;
-        scanf("%d", &var);
-        switch (var) {
-            case 1:
-               unconnect(connections);
-               pthread_kill(listen_th, SIGINT);
-               cycle = 0;
-               break;
-        }
+    char comm[1024];
+    int a = 0;
+    while (1) {
+        while((ch = getchar()) != EOF) {
+            if (ch == '\n')
+                break;
+            comm[a] = (char)ch;
+            ++a;
+        }       
+        parse_chat_command(comm);
+        memset(comm, 0, 1024);
+        a = 0;
     }
 
     void *res;

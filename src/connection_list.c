@@ -61,7 +61,10 @@ struct client_connection_node *get_client_info(struct client_connection_node *li
         return NULL;
     }
     struct client_connection_node *tmp = list;
-    while (tmp != NULL || strncmp(tmp->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
+    while (tmp != NULL) {
+        if (!strncmp(tmp->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
+            break;
+        }
         tmp = tmp->next;
     }
 
@@ -76,7 +79,10 @@ int remove_connection(struct client_connection_node *list, const char *name)
     }
     struct client_connection_node *tmp = list;
     struct client_connection_node *destroyed = NULL;
-    while (tmp->next != NULL || strncmp(tmp->next->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
+    while (tmp->next != NULL) {
+        if (!strncmp(tmp->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
+            break;
+        }
         tmp = tmp->next;
     }
     destroyed = tmp->next;
