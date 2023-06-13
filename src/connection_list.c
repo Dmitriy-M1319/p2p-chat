@@ -80,7 +80,7 @@ int remove_connection(struct client_connection_node *list, const char *name)
     struct client_connection_node *tmp = list;
     struct client_connection_node *destroyed = NULL;
     while (tmp->next != NULL) {
-        if (!strncmp(tmp->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
+        if (!strncmp(tmp->next->client_name, name, CLIENT_NAME_MAX_LENGTH)) {
             break;
         }
         tmp = tmp->next;
