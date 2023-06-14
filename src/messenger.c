@@ -77,7 +77,7 @@ int send_file(client_connection *list, const char *filename, const char *receive
     FILE *fd;
     long bytes_send = 0;
     long filesize;
-    char buf[MESSAGE_MAX_LENGTH];
+    char buf[512] = {0};
     struct client_message file_part;
     client_connection *client = NULL;
 
@@ -105,9 +105,7 @@ int send_file(client_connection *list, const char *filename, const char *receive
         int bytes_to_read = (filesize - bytes_send < MESSAGE_MAX_LENGTH) ? filesize - bytes_send : MESSAGE_MAX_LENGTH;
         bytes_send += fread(buf, 1, bytes_to_read, fd);
         
-        file_part.size = bytes_to_read;
-        memcpy(file_part.msg, buf, bytes_to_read);
-        if (send(client->client_socket, &file_part, sizeof(file_part), 0) < 0) {
+        if (send(client->client_socket, &buf, sizeof(buf), 0) < 0) {
             fprintf(stderr, "Failed to send a file for client %s: %s\n", 
                     client->client_name, 
                     strerror(errno));

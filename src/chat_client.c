@@ -13,9 +13,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 
 // Список всех подключений для клиентов в локальной сети
@@ -37,7 +34,6 @@ struct thread_args
 void kill_program_handler(int sig)
 {
     // Здесь сделать дополнительное отсоединение от других клиентов
-    puts("убився");
     free_connection_list(connections);
     long max = sysconf(_SC_OPEN_MAX);
 
@@ -53,7 +49,7 @@ void *receive_msg(void *data)
     int bytes_read;
     client_msg message; 
     char removed_user[CLIENT_NAME_MAX_LENGTH];
-    char buffer[MESSAGE_MAX_LENGTH];
+    char buffer[512] = {0};
     FILE *received_file_fd;
     long filesize, bytes_recv = 0;
     while (1) {
@@ -86,15 +82,18 @@ void *receive_msg(void *data)
                     received_file_fd = fopen(message.filename, "wb");
                     filesize = message.size;
                     printf("От пользователя %s пришел запрос на отправку файла %s\n", args->curr_client->client_name, message.filename);
-                } else {
-                    if (bytes_recv < filesize) {
-                        memcpy(buffer, message.msg, message.size);
-                        fwrite(buffer, 1, message.size, received_file_fd);
-                        bytes_recv += message.size; 
-                    } else {
-                        fclose(received_file_fd);
-                        printf("Пользователь %s отправил вам файл %s\n", args->curr_client->client_name, message.filename);
-                    }
+
+                    while (bytes_recv < filesize) {
+                        if (recv(args->curr_client->client_socket, &buffer, sizeof(buffer), 0) < 0) {
+                            perror("failed to recv file data");
+                            break;
+                        }
+                        fwrite(buffer, 1, sizeof(buffer), received_file_fd);
+                        bytes_recv += sizeof(buffer); 
+                    } 
+
+                    fclose(received_file_fd);
+                    printf("Пользователь %s отправил вам файл %s\n", args->curr_client->client_name, message.filename);
                 }
                 break;
         } 
