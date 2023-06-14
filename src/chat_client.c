@@ -53,7 +53,9 @@ void *receive_msg(void *data)
     int bytes_read;
     client_msg message; 
     char removed_user[CLIENT_NAME_MAX_LENGTH];
-    int received_file_fd = 0;
+    char buffer[MESSAGE_MAX_LENGTH];
+    FILE *received_file_fd;
+    long filesize, bytes_recv = 0;
     while (1) {
         if ((bytes_read = recv(args->curr_client->client_socket, &message, sizeof(message), 0)) < 0) {
             fprintf(stderr, "Failed to receive message from client: %s\n", strerror(errno));
@@ -81,14 +83,16 @@ void *receive_msg(void *data)
                 return NULL;
             case FILE_MSG:
                 if (!received_file_fd) {
-                    received_file_fd = open(message.filename, O_CREAT | O_APPEND, 0666);
-                    write(received_file_fd, message.msg, MESSAGE_MAX_LENGTH);
+                    received_file_fd = fopen(message.filename, "wb");
+                    filesize = message.size;
+                    printf("От пользователя %s пришел запрос на отправку файла %s\n", args->curr_client->client_name, message.filename);
                 } else {
-                    int header_size = sizeof(enum msg_type) + sizeof(char) * MESSAGE_MAX_LENGTH + sizeof(int);
-                    if (bytes_read - header_size > 0) {
-                        write(received_file_fd, message.msg, MESSAGE_MAX_LENGTH);
+                    if (bytes_recv < filesize) {
+                        memcpy(buffer, message.msg, message.size);
+                        fwrite(buffer, 1, message.size, received_file_fd);
+                        bytes_recv += message.size; 
                     } else {
-                        close(received_file_fd);
+                        fclose(received_file_fd);
                         printf("Пользователь %s отправил вам файл %s\n", args->curr_client->client_name, message.filename);
                     }
                 }

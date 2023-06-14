@@ -74,41 +74,48 @@ int send_msg(client_connection *list, const char *receiver, const char *msg)
 
 int send_file(client_connection *list, const char *filename, const char *receiver)
 {
-    int file_fd = open(filename, O_RDONLY);
-    int bytes_read;
+    FILE *fd;
+    long bytes_send = 0;
+    long filesize;
     char buf[MESSAGE_MAX_LENGTH];
     struct client_message file_part;
     client_connection *client = NULL;
-    struct stat file_stat; 
 
     if ((client = get_client_info(list, receiver)) == NULL) {
         fprintf(stderr, "No such client for sending\n");
-        close(file_fd);
         return -1;
     }
 
     file_part.type = FILE_MSG;
     strncpy(file_part.filename, filename, MESSAGE_MAX_LENGTH);
 
-    if (stat(filename, &file_stat) < 0) {
-        fprintf(stderr, "Failed to get information by file\n");
-        close(file_fd);
-        return -1;
+    fd = fopen(filename, "rb");
+    fseek(fd, 0L, SEEK_END);
+    filesize = ftell(fd);
+    rewind(fd);
+    file_part.size = filesize;
+
+    if (send(client->client_socket, &file_part, sizeof(file_part), 0) < 0){
+        perror("send file size");
+        fclose(fd);
+        return 1;
     }
 
-    file_part.size = file_stat.st_size;
-    
-    while ((bytes_read = read(file_fd, buf, MESSAGE_MAX_LENGTH)) != 0) {
-        strncpy(file_part.msg, buf, MESSAGE_MAX_LENGTH);
+    while (bytes_send < filesize) {
+        int bytes_to_read = (filesize - bytes_send < MESSAGE_MAX_LENGTH) ? filesize - bytes_send : MESSAGE_MAX_LENGTH;
+        bytes_send += fread(buf, 1, bytes_to_read, fd);
+        
+        file_part.size = bytes_to_read;
+        memcpy(file_part.msg, buf, bytes_to_read);
         if (send(client->client_socket, &file_part, sizeof(file_part), 0) < 0) {
             fprintf(stderr, "Failed to send a file for client %s: %s\n", 
                     client->client_name, 
                     strerror(errno));
-            close(file_fd);
+            fclose(fd);
             return -1;
         }
     }
 
-    close(file_fd);
+    fclose(fd);
     return 0;
 }

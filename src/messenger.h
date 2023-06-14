@@ -29,7 +29,7 @@ struct client_message
 {
     enum msg_type type;
     char filename[MESSAGE_MAX_LENGTH];
-    int size;
+    long size;
     char msg[MESSAGE_MAX_LENGTH];
 };
 

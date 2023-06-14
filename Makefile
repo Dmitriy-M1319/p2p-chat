@@ -12,3 +12,7 @@ udp_client_connection_query.o: src/udp_client_connection_query.c
 
 messenger.o: src/messenger.c
 	$(CC) $(CFLAGS) -c src/messenger.c
+
+clean:
+	rm *.o
+	rm bin/chat_client
