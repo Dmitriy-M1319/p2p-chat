@@ -77,7 +77,8 @@ int send_file(client_connection *list, const char *filename, const char *receive
     FILE *fd;
     long bytes_send = 0;
     long filesize;
-    char buf[512] = {0};
+    char buf[FILE_BUFFER_MAX_LENGTH] = {0};
+    char name[MESSAGE_MAX_LENGTH];
     struct client_message file_part;
     client_connection *client = NULL;
 
@@ -89,7 +90,9 @@ int send_file(client_connection *list, const char *filename, const char *receive
     file_part.type = FILE_MSG;
     strncpy(file_part.filename, filename, MESSAGE_MAX_LENGTH);
 
-    fd = fopen(filename, "rb");
+    strncpy(name, filename, strlen(filename));
+
+    fd = fopen(name, "rb");
     fseek(fd, 0L, SEEK_END);
     filesize = ftell(fd);
     rewind(fd);
@@ -102,10 +105,11 @@ int send_file(client_connection *list, const char *filename, const char *receive
     }
 
     while (bytes_send < filesize) {
-        int bytes_to_read = (filesize - bytes_send < MESSAGE_MAX_LENGTH) ? filesize - bytes_send : MESSAGE_MAX_LENGTH;
-        bytes_send += fread(buf, 1, bytes_to_read, fd);
+        int bytes_to_read = (filesize - bytes_send < FILE_BUFFER_MAX_LENGTH) ? filesize - bytes_send : FILE_BUFFER_MAX_LENGTH;
+        int read = fread(buf, 1, bytes_to_read, fd);
+        bytes_send += read;
         
-        if (send(client->client_socket, &buf, sizeof(buf), 0) < 0) {
+        if (send(client->client_socket, &buf, read, 0) < 0) {
             fprintf(stderr, "Failed to send a file for client %s: %s\n", 
                     client->client_name, 
                     strerror(errno));

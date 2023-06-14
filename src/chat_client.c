@@ -53,6 +53,7 @@ void *receive_msg(void *data)
     FILE *received_file_fd;
     long filesize, bytes_recv = 0;
     while (1) {
+        memset(message.msg, 0, sizeof(message.msg));
         if ((bytes_read = recv(args->curr_client->client_socket, &message, sizeof(message), 0)) < 0) {
             fprintf(stderr, "Failed to receive message from client: %s\n", strerror(errno));
             return NULL;
@@ -78,23 +79,24 @@ void *receive_msg(void *data)
                 pthread_mutex_unlock(&print_mut);
                 return NULL;
             case FILE_MSG:
-                if (!received_file_fd) {
-                    received_file_fd = fopen(message.filename, "wb");
-                    filesize = message.size;
-                    printf("От пользователя %s пришел запрос на отправку файла %s\n", args->curr_client->client_name, message.filename);
+                received_file_fd = fopen(message.filename, "wb");
+                filesize = message.size;
+                printf("От пользователя %s пришел запрос на отправку файла %s\n", args->curr_client->client_name, message.filename);
+                while (bytes_recv < filesize) {
+                    int read;
+                    if ((read = recv(args->curr_client->client_socket, &buffer, sizeof(buffer), 0)) < 0) {
+                        perror("failed to recv file data");
+                        break;
+                    }
+                    fwrite(buffer, 1, read, received_file_fd);
+                    bytes_recv += read; 
+                    puts("идет файл");
+                } 
 
-                    while (bytes_recv < filesize) {
-                        if (recv(args->curr_client->client_socket, &buffer, sizeof(buffer), 0) < 0) {
-                            perror("failed to recv file data");
-                            break;
-                        }
-                        fwrite(buffer, 1, sizeof(buffer), received_file_fd);
-                        bytes_recv += sizeof(buffer); 
-                    } 
-
-                    fclose(received_file_fd);
-                    printf("Пользователь %s отправил вам файл %s\n", args->curr_client->client_name, message.filename);
-                }
+                fclose(received_file_fd);
+                printf("Пользователь %s отправил вам файл %s\n", args->curr_client->client_name, message.filename);
+                memset(buffer, 0, sizeof(buffer));
+                bytes_recv = 0;
                 break;
         } 
     }

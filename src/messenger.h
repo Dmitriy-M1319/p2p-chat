@@ -5,6 +5,7 @@
 #include "connection_list.h"
 
 #define MESSAGE_MAX_LENGTH 255
+#define FILE_BUFFER_MAX_LENGTH 512
 
 typedef struct client_message client_msg;
 
