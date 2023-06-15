@@ -1,5 +1,8 @@
 #include "udp_client_connection_query.h"
+#include "connection_list.h"
+#include "ssl_utils.h"
 #include <netinet/in.h>
+#include <openssl/ssl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -169,4 +172,52 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
 
     printf("Клиент %s успешно подключен", data->nickname);
     return new_tcp_client_socket;
+}
+
+
+SSL *create_secure_connection(struct query_datagramm *data, client_connection *connections)
+{
+    int status, new_tcp_client_socket;
+    struct sockaddr_in client_addr;
+    socklen_t length = sizeof(client_addr);
+    SSL_CTX *context;
+    SSL *ssl;
+
+    printf("Получен ответ на запрос подключения от %s\n", data->nickname);
+
+    context = get_context(SSL_CONTEXT_CLIENT);
+    ssl = SSL_new(context);
+
+    new_tcp_client_socket = create_tcp_client_socket();
+    client_addr.sin_port = htons(data->port);
+    client_addr.sin_family = AF_INET;
+    inet_aton(data->address, &(client_addr.sin_addr));
+
+    sleep(1);
+    if(connect(new_tcp_client_socket, (struct sockaddr *)&client_addr, length) < 0) {
+        fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
+        SSL_free(ssl);
+        SSL_CTX_free(context);
+        return NULL;
+    }
+
+    status = SSL_set_fd(ssl, new_tcp_client_socket);
+    if (status != 1) {
+        error(SSL_get_error(ssl, status));
+    }
+    status = SSL_connect(ssl);
+    if (status != 1) {
+        error(SSL_get_error(ssl, status));
+    }
+
+    check_server_certificate_sign(context, ssl);
+    sleep(2);
+
+    if(!add_new_secure_connection(connections, data->nickname, new_tcp_client_socket, &client_addr, ssl)) {
+        fprintf(stderr, "Failed to add new client %s\n", data->nickname);
+        return NULL;
+    }
+
+    printf("Клиент %s успешно подключен", data->nickname);
+    return ssl;
 }

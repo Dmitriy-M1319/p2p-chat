@@ -3,6 +3,7 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <openssl/ssl.h>
 
 #define CLIENT_NAME_MAX_LENGTH 256
 
@@ -18,6 +19,7 @@ struct client_connection_node
 {
     char client_name[CLIENT_NAME_MAX_LENGTH];
     int client_socket;
+    SSL *ssl;
     struct sockaddr_in client_address_info;
     struct client_connection_node *next;
 };
@@ -38,6 +40,7 @@ void print_list(client_connection *list);
  * Возвращает ссылку на созданный объект
  */
 client_connection *add_new_connection(client_connection *list, const char *name, int socket, const struct sockaddr_in *addr);
+client_connection *add_new_secure_connection(client_connection *list, const char *name, int socket, const struct sockaddr_in *addr, SSL *ssl);
 
 /**
  * Получить указатель на узел подключения для определенного имени клиента

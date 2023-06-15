@@ -4,6 +4,7 @@
 
 #include "connection_list.h"
 #include <netinet/in.h>
+#include <openssl/types.h>
 // ----- Вот это все дело вынести в конфиг потом
 #define UDP_NEW_CLIENT_PORT "55031" 
 #define UDP_BROADCAST_PORT 55030
@@ -72,4 +73,11 @@ int send_connection_response(int udp_socket, struct sockaddr *client_info, struc
  * В случае ошибки возвращает -1
  */
 int create_client_connection(struct query_datagramm *data, client_connection *connections);
+
+/**
+ * Создать новое защищенное TCP - подключение с клиентом, который ответил на запрос о включении в сеть
+ * В случае ошибки возвращает NULL
+ */
+SSL* create_secure_connection(struct query_datagramm *data, client_connection *connections);
+
 #endif
