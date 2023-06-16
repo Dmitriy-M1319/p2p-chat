@@ -78,6 +78,6 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
  * Создать новое защищенное TCP - подключение с клиентом, который ответил на запрос о включении в сеть
  * В случае ошибки возвращает NULL
  */
-SSL* create_secure_connection(struct query_datagramm *data, client_connection *connections);
+int create_secure_connection(struct query_datagramm *data, client_connection *connections);
 
 #endif

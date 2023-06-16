@@ -54,6 +54,27 @@ client_connection *add_new_connection(struct client_connection_node *list, const
     return tmp->next;
 }
 
+client_connection *add_new_secure_connection(struct client_connection_node *list, const char *name, int socket, const struct sockaddr_in *addr, SSL *ssl, SSL_CTX *ctx)
+{
+    if (list == NULL) {
+        return NULL;
+    }
+    struct client_connection_node *tmp = list;
+    while (tmp->next != NULL) {
+        tmp = tmp->next;
+    }
+
+    if((tmp->next = (struct client_connection_node *)malloc(sizeof(struct client_connection_node))) == NULL ) {
+        return NULL;
+    }
+
+    strncpy(tmp->next->client_name, name, CLIENT_NAME_MAX_LENGTH);
+    tmp->next->client_socket = socket;
+    memcpy(&tmp->next->client_address_info, addr, sizeof(struct sockaddr_in));
+    tmp->next->ssl = ssl;
+    tmp->next->context = ctx;
+    return tmp->next;
+}
 
 struct client_connection_node *get_client_info(struct client_connection_node *list, const char *name)
 {
@@ -90,6 +111,10 @@ int remove_connection(struct client_connection_node *list, const char *name)
 
     // Закрываем сокет
     close(destroyed->client_socket);
+    if (destroyed->ssl) {
+        SSL_free(destroyed->ssl);
+        SSL_CTX_free(destroyed->context);
+    }
     free(destroyed);
     return 0;
 }
@@ -108,6 +133,10 @@ int free_connection_list(struct client_connection_node *list)
         // Закрываем сокет
         if (destroyed->client_socket != -1) {
             close(destroyed->client_socket);
+        }
+        if (destroyed->ssl) {
+            SSL_free(destroyed->ssl);
+            SSL_CTX_free(destroyed->context);
         }
         free(destroyed);
     }

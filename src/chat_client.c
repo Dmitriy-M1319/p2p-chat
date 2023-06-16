@@ -1,9 +1,12 @@
+#include "ssl_utils.h"
 #include "udp_client_connection_query.h"
 #include "connection_list.h"
 #include "messenger.h"
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,8 +57,10 @@ void *receive_msg(void *data)
     long filesize, bytes_recv = 0;
     while (1) {
         memset(message.msg, 0, sizeof(message.msg));
-        if ((bytes_read = recv(args->curr_client->client_socket, &message, sizeof(message), 0)) < 0) {
-            fprintf(stderr, "Failed to receive message from client: %s\n", strerror(errno));
+        //if ((bytes_read = recv(args->curr_client->client_socket, &message, sizeof(message), 0)) < 0) {
+        if ((bytes_read = SSL_read(args->curr_client->ssl, &message, sizeof(message))) <= 0) {
+            fprintf(stderr, "Failed to receive message from client\n");
+            ERR_print_errors_fp(stderr);
             return NULL;
         }
         switch (message.type) {
@@ -84,13 +89,14 @@ void *receive_msg(void *data)
                 printf("От пользователя %s пришел запрос на отправку файла %s\n", args->curr_client->client_name, message.filename);
                 while (bytes_recv < filesize) {
                     int read;
-                    if ((read = recv(args->curr_client->client_socket, &buffer, sizeof(buffer), 0)) < 0) {
-                        perror("failed to recv file data");
+                    //if ((read = recv(args->curr_client->client_socket, &buffer, sizeof(buffer), 0)) < 0) {
+                    if ((read = SSL_read(args->curr_client->ssl, &buffer, sizeof(buffer))) <= 0) {
+                        fprintf(stderr, "Failed to receive a file data\n");
+                        ERR_print_errors_fp(stderr);
                         break;
                     }
                     fwrite(buffer, 1, read, received_file_fd);
                     bytes_recv += read; 
-                    puts("идет файл");
                 } 
 
                 fclose(received_file_fd);
@@ -112,7 +118,11 @@ void *thread_connection(void *args)
         fprintf(stderr, "Failed to lock connection list\n");
         exit(1);
     }
-    if(create_client_connection(elements->data, elements->connection_list) == -1) {
+    /*if(create_client_connection(elements->data, elements->connection_list) == -1) {
+        fprintf(stderr, "Failed to create new connection to client\n");
+        exit(2);
+    }*/
+    if(create_secure_connection(elements->data, elements->connection_list) == -1) {
         fprintf(stderr, "Failed to create new connection to client\n");
         exit(2);
     }
@@ -144,7 +154,6 @@ void query_invitation_in_network(const char *client_name)
         if (recvfrom(query_socket, &data, sizeof(data), 0, &addr, &addr_len) == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN) {
                 // Ответа нет: или мы первые в сети, или подключились ко всем клиентам
-                puts("Кто то в сети первый");
                 close(query_socket);
                 break;
             }
@@ -192,8 +201,9 @@ void *listen_new_clients(void *client_name)
     // Теперь ждем входящих запросов (сделать завершение прослушивания через сигналы)
     while (1) {
         struct query_datagramm request; 
-        int req_tcp_socket;
+        int req_tcp_socket, ssl_result;
         struct sockaddr_in client_req;
+        client_connection *new_client;
         socklen_t client_length = sizeof(client_req);
         if(recvfrom(udp_listen_socket, 
                     &request, sizeof(request), 0, 
@@ -203,6 +213,9 @@ void *listen_new_clients(void *client_name)
         }
         printf("Установка подключения к %s\n", request.nickname);
         // Как только получили запрос, сразу же создаем все условия
+        
+        SSL_CTX *context = get_context(SSL_CONTEXT_SERVER);
+        SSL *ssl = SSL_new(context);
         req_tcp_socket = create_tcp_client_socket();
 
         // Привязываем новый сокет к локальному адресу
@@ -232,12 +245,33 @@ void *listen_new_clients(void *client_name)
         send_connection_response(udp_listen_socket, (struct sockaddr *)&client_req, &response);
         int new_tcp_sock = accept(req_tcp_socket, NULL, NULL);
 
-        client_connection *new_client;
+        ssl_result = SSL_set_fd(ssl, new_tcp_sock);
+        if (ssl_result!= 1) {
+            error(SSL_get_error(ssl, ssl_result));
+            exit(1);
+        }
+        
+        ssl_result = 0;
+        sleep(2);
+        while (ssl_result != 1) {
+            ssl_result = SSL_accept(ssl);
+            if (ssl_result != 1) {
+                error(SSL_get_error(ssl, ssl_result));
+                exit(3);
+            }
+        }
 
-        if (!(new_client = add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req))) {
+
+        /*if (!(new_client = add_new_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req))) {
             fprintf(stderr, "Failed to add new client %s\n", request.nickname);
             exit(1);
-        };
+        };*/
+
+        if (!(new_client = add_new_secure_connection(connections, request.nickname, new_tcp_sock, (struct sockaddr_in *)&client_req, ssl, context))) {
+            fprintf(stderr, "Failed to add new client %s\n", request.nickname);
+            exit(1);
+        }
+
         printf("Подключение к %s было установлено\n", request.nickname);
         pthread_t connection_th;
         struct receive_msg_args args;

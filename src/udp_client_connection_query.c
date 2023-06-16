@@ -175,7 +175,7 @@ int create_client_connection(struct query_datagramm *data, client_connection *co
 }
 
 
-SSL *create_secure_connection(struct query_datagramm *data, client_connection *connections)
+int create_secure_connection(struct query_datagramm *data, client_connection *connections)
 {
     int status, new_tcp_client_socket;
     struct sockaddr_in client_addr;
@@ -198,7 +198,7 @@ SSL *create_secure_connection(struct query_datagramm *data, client_connection *c
         fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
         SSL_free(ssl);
         SSL_CTX_free(context);
-        return NULL;
+        return -1;
     }
 
     status = SSL_set_fd(ssl, new_tcp_client_socket);
@@ -213,11 +213,11 @@ SSL *create_secure_connection(struct query_datagramm *data, client_connection *c
     check_server_certificate_sign(context, ssl);
     sleep(2);
 
-    if(!add_new_secure_connection(connections, data->nickname, new_tcp_client_socket, &client_addr, ssl)) {
+    if(!add_new_secure_connection(connections, data->nickname, new_tcp_client_socket, &client_addr, ssl, context)) {
         fprintf(stderr, "Failed to add new client %s\n", data->nickname);
-        return NULL;
+        return -1;
     }
 
     printf("Клиент %s успешно подключен", data->nickname);
-    return ssl;
+    return 0;
 }

@@ -20,6 +20,7 @@ struct client_connection_node
     char client_name[CLIENT_NAME_MAX_LENGTH];
     int client_socket;
     SSL *ssl;
+    SSL_CTX *context;
     struct sockaddr_in client_address_info;
     struct client_connection_node *next;
 };
@@ -40,7 +41,7 @@ void print_list(client_connection *list);
  * Возвращает ссылку на созданный объект
  */
 client_connection *add_new_connection(client_connection *list, const char *name, int socket, const struct sockaddr_in *addr);
-client_connection *add_new_secure_connection(client_connection *list, const char *name, int socket, const struct sockaddr_in *addr, SSL *ssl);
+client_connection *add_new_secure_connection(client_connection *list, const char *name, int socket, const struct sockaddr_in *addr, SSL *ssl, SSL_CTX *ctx);
 
 /**
  * Получить указатель на узел подключения для определенного имени клиента

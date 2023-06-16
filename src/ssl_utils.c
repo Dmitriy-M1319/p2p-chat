@@ -50,6 +50,10 @@ SSL_CTX *get_context(enum ssl_context_type type)
         SSL_CTX_free(context);
         return NULL;
     }
+
+    SSL_CTX_set_verify_depth(context, 1);
+    SSL_CTX_set_cipher_list(context, "HIGH:!aNULL:!kRSA:!PSK:!SRP:!MD5:!RC4");
+
     return context;
 }
 

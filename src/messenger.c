@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <openssl/err.h>
 
 
 int unconnect(client_connection *list)
@@ -24,8 +25,13 @@ int unconnect(client_connection *list)
     client_connection *tmp = list;
     while (tmp != NULL) {
         if (tmp->client_socket != -1) {
-            if (send(tmp->client_socket, &unconnect_data, sizeof(unconnect_data), 0) < 0) {
+            /*if (send(tmp->client_socket, &unconnect_data, sizeof(unconnect_data), 0) < 0) {
                 fprintf(stderr, "Failed to send the unconnect request to clients: %s\n", strerror(errno));
+                return -1;
+            }*/
+            if (SSL_write(tmp->ssl, &unconnect_data, sizeof(unconnect_data)) <= 0) {
+                fprintf(stderr, "Failed to send the unconnect request to clients\n");
+                ERR_print_errors_fp(stderr);
                 return -1;
             }
         }
@@ -47,8 +53,13 @@ int send_msg(client_connection *list, const char *receiver, const char *msg)
         client_connection *tmp = list;
         while (tmp != NULL) {
             if (tmp->client_socket != -1) {
-                if (send(tmp->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
+                /*if (send(tmp->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
                     fprintf(stderr, "Failed to send a message for clients: %s\n", strerror(errno));
+                    return -1;
+                }*/
+                if (SSL_write(tmp->ssl, &msg_packet, sizeof(msg_packet)) <= 0) {
+                    fprintf(stderr, "Failed to send a message for clients\n");
+                    ERR_print_errors_fp(stderr);
                     return -1;
                 }
             }
@@ -61,10 +72,15 @@ int send_msg(client_connection *list, const char *receiver, const char *msg)
             fprintf(stderr, "No such client for sending");
             return -1;
         }
-        if (send(client->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
+        /*if (send(client->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
             fprintf(stderr, "Failed to send a message for client %s: %s\n", 
                     client->client_name, 
                     strerror(errno));
+            return -1;
+        }*/
+        if (SSL_write(client->ssl, &msg_packet, sizeof(msg_packet)) <= 0) {
+            fprintf(stderr, "Failed to send a message for client %s\n", client->client_name);
+            ERR_print_errors_fp(stderr);
             return -1;
         }
     }
@@ -98,8 +114,15 @@ int send_file(client_connection *list, const char *filename, const char *receive
     rewind(fd);
     file_part.size = filesize;
 
-    if (send(client->client_socket, &file_part, sizeof(file_part), 0) < 0){
+    /*if (send(client->client_socket, &file_part, sizeof(file_part), 0) < 0){
         perror("send file size");
+        fclose(fd);
+        return 1;
+    }*/
+
+    if (SSL_write(client->ssl, &file_part, sizeof(file_part)) <= 0){
+        fprintf(stderr, "Failed to send a file size for client %s\n", client->client_name);
+        ERR_print_errors_fp(stderr);
         fclose(fd);
         return 1;
     }
@@ -109,10 +132,16 @@ int send_file(client_connection *list, const char *filename, const char *receive
         int read = fread(buf, 1, bytes_to_read, fd);
         bytes_send += read;
         
-        if (send(client->client_socket, &buf, read, 0) < 0) {
+        /*if (send(client->client_socket, &buf, read, 0) < 0) {
             fprintf(stderr, "Failed to send a file for client %s: %s\n", 
                     client->client_name, 
                     strerror(errno));
+            fclose(fd);
+            return -1;
+        }*/
+        if (SSL_write(client->ssl, &buf, read) <= 0) {
+            fprintf(stderr, "Failed to send a file for client %s\n", client->client_name);
+            ERR_print_errors_fp(stderr);
             fclose(fd);
             return -1;
         }
