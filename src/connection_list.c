@@ -12,6 +12,7 @@ struct client_connection_node *create_client_list()
     struct client_connection_node *head = (struct client_connection_node *)malloc(sizeof(struct client_connection_node));
     strncpy(head->client_name, " ", CLIENT_NAME_MAX_LENGTH);
     head->client_socket = -1;
+    head->next = NULL;
     return head;
 }
 
@@ -50,6 +51,7 @@ client_connection *add_new_connection(struct client_connection_node *list, const
     strncpy(tmp->next->client_name, name, CLIENT_NAME_MAX_LENGTH);
     tmp->next->client_socket = socket;
     memcpy(&tmp->next->client_address_info, addr, sizeof(struct sockaddr_in));
+    tmp->next->next = NULL;
 
     return tmp->next;
 }
@@ -73,6 +75,7 @@ client_connection *add_new_secure_connection(struct client_connection_node *list
     memcpy(&tmp->next->client_address_info, addr, sizeof(struct sockaddr_in));
     tmp->next->ssl = ssl;
     tmp->next->context = ctx;
+    tmp->next->next = NULL;
     return tmp->next;
 }
 
@@ -120,15 +123,15 @@ int remove_connection(struct client_connection_node *list, const char *name)
 }
 
 
-int free_connection_list(struct client_connection_node *list)
+int free_connection_list(struct client_connection_node **list)
 {
-    if (list == NULL) {
+    if ((*list) == NULL) {
         return -1;
     }
     struct client_connection_node *destroyed = NULL;
-    while (list->next != NULL) {
-        destroyed = list;
-        list = list->next;
+    while ((*list)->next != NULL) {
+        destroyed = *list;
+        *list = (*list)->next;
 
         // Закрываем сокет
         if (destroyed->client_socket != -1) {
@@ -141,5 +144,14 @@ int free_connection_list(struct client_connection_node *list)
         free(destroyed);
     }
 
+    if ((*list)->client_socket != -1) {
+        close((*list)->client_socket);
+    }
+    if ((*list)->ssl) {
+        SSL_free((*list)->ssl);
+        SSL_CTX_free((*list)->context);
+    }
+    free(*list);
+    *list = NULL;
     return 0; 
 }

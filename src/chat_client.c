@@ -37,7 +37,7 @@ struct thread_args
 void kill_program_handler(int sig)
 {
     // Здесь сделать дополнительное отсоединение от других клиентов
-    free_connection_list(connections);
+    free_connection_list(&connections);
     long max = sysconf(_SC_OPEN_MAX);
 
     while (--max >= 0)
@@ -366,6 +366,6 @@ int main(int argc, char *argv[])
     pthread_join(listen_th, &res);
     printf("Listen thread return %ld\n", (long)res);
 
-    free_connection_list(connections);
+    free_connection_list(&connections);
     return 0;
 }

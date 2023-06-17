@@ -59,7 +59,7 @@ int remove_connection(client_connection *list, const char *name);
  * Очищает весь список подключений к клиентам
  * Возвращает -1 в случае ошибки
  */
-int free_connection_list(client_connection *list);
+int free_connection_list(client_connection **list);
 
 
 #endif
