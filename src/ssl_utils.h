@@ -6,8 +6,8 @@
 
 //TODO: вынести в конфигурационный файл
 #define CA_CERTIFICATE_PATH "ca.crt"
-#define SSL_CERTIFICATE_PATH "chat.crt"
-#define SSL_PKEY_PATH "chat.key"
+#define CLIENT_SSL_CERTIFICATE_PATH "chat.crt"
+#define CLIENT_SSL_PRIVATE_KEY_PATH "chat.key"
 
 /**
  * Тип контекста SSL (сервер - клиент, который принимает новое подключение, 
@@ -15,8 +15,8 @@
  */
 enum ssl_context_type
 {
-    SSL_CONTEXT_SERVER,
-    SSL_CONTEXT_CLIENT
+    SSL_CONTEXT_FOR_SERVER,
+    SSL_CONTEXT_FOR_CLIENT
 };
 
 /**
@@ -28,8 +28,7 @@ SSL_CTX *get_context(enum ssl_context_type type);
  * Проверить сертификат клиента, с которым устанавливается соединение, на подпись корневым
  * В случае ошибки возвращает -1
  */
-int check_server_certificate_sign(SSL_CTX *context, SSL *ssl);
+int check_server_certificate_sign(SSL_CTX *context, SSL *ssl_object);
 
-
-void error(int err_value);
+void print_error(int err_value);
 #endif

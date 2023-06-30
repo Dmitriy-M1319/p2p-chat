@@ -12,74 +12,58 @@
 #include <openssl/err.h>
 
 
-int unconnect(client_connection *list)
+int unconnect(client_connection *connections)
 {
-    if (list == NULL) {
+    if (connections == NULL) {
         fprintf(stderr, "The list ofn connections doesn't exist\n");
         return -1;
     }
 
-    struct client_message unconnect_data;
-    unconnect_data.type = UNCONNECT_MSG;
+    struct client_message msg_datagramm;
+    msg_datagramm.type = UNCONNECT_QUERY_MSG;
 
-    client_connection *tmp = list;
-    while (tmp != NULL) {
-        if (tmp->client_socket != -1) {
-            /*if (send(tmp->client_socket, &unconnect_data, sizeof(unconnect_data), 0) < 0) {
-                fprintf(stderr, "Failed to send the unconnect request to clients: %s\n", strerror(errno));
-                return -1;
-            }*/
-            if (SSL_write(tmp->ssl, &unconnect_data, sizeof(unconnect_data)) <= 0) {
+    client_connection *connection_ptr = connections;
+    while (connection_ptr != NULL) {
+        if (connection_ptr->client_socket != -1) {
+            if (SSL_write(connection_ptr->ssl_object, &msg_datagramm, sizeof(msg_datagramm)) <= 0) {
                 fprintf(stderr, "Failed to send the unconnect request to clients\n");
                 ERR_print_errors_fp(stderr);
                 return -1;
             }
         }
-        tmp = tmp->next;
+        connection_ptr = connection_ptr->next;
     }
     
     return 0;
 }
 
 
-int send_msg(client_connection *list, const char *receiver, const char *msg)
+int send_msg(client_connection *connections, const char *optional_client, const char *msg)
 {
-    struct client_message msg_packet;
-    strncpy(msg_packet.msg, msg, strlen(msg));
-
-    if (receiver == NULL) {
-        msg_packet.type = ALL_CLIENTS_MSG;
-        // Отправляем сообщение всем клиентам
-        client_connection *tmp = list;
-        while (tmp != NULL) {
-            if (tmp->client_socket != -1) {
-                /*if (send(tmp->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
-                    fprintf(stderr, "Failed to send a message for clients: %s\n", strerror(errno));
-                    return -1;
-                }*/
-                if (SSL_write(tmp->ssl, &msg_packet, sizeof(msg_packet)) <= 0) {
+    struct client_message msg_datagramm;
+    strncpy(msg_datagramm.msg, msg, strlen(msg));
+    if (optional_client == NULL) {
+        msg_datagramm.type = ALL_CLIENTS_MSG;
+        client_connection *connection_ptr = connections;
+        while (connection_ptr != NULL) {
+            if (connection_ptr->client_socket != -1) {
+                if (SSL_write(connection_ptr->ssl_object, &msg_datagramm, sizeof(msg_datagramm)) <= 0) {
                     fprintf(stderr, "Failed to send a message for clients\n");
                     ERR_print_errors_fp(stderr);
                     return -1;
                 }
             }
-            tmp = tmp->next;
+            connection_ptr = connection_ptr->next;
         }
     } else {
-        msg_packet.type = PRIVATE_MSG;
-        client_connection *client = NULL;
-        if ((client = get_client_info(list, receiver)) == NULL) {
+        msg_datagramm.type = PRIVATE_CLIENT_MSG;
+        client_connection *connection_for_client = NULL;
+        if ((connection_for_client = get_connection(connections, optional_client)) == NULL) {
             fprintf(stderr, "No such client for sending");
             return -1;
         }
-        /*if (send(client->client_socket, &msg_packet, sizeof(msg_packet), 0) < 0) {
-            fprintf(stderr, "Failed to send a message for client %s: %s\n", 
-                    client->client_name, 
-                    strerror(errno));
-            return -1;
-        }*/
-        if (SSL_write(client->ssl, &msg_packet, sizeof(msg_packet)) <= 0) {
-            fprintf(stderr, "Failed to send a message for client %s\n", client->client_name);
+        if (SSL_write(connection_for_client->ssl_object, &msg_datagramm, sizeof(msg_datagramm)) <= 0) {
+            fprintf(stderr, "Failed to send a message for client %s\n", connection_for_client->client_name);
             ERR_print_errors_fp(stderr);
             return -1;
         }
@@ -88,65 +72,52 @@ int send_msg(client_connection *list, const char *receiver, const char *msg)
 }
 
 
-int send_file(client_connection *list, const char *filename, const char *receiver)
+int send_file_to_client(client_connection *connections, const char *filename, const char *client)
 {
-    FILE *fd;
+    FILE *file_descriptor;
     long bytes_send = 0;
     long filesize;
-    char buf[FILE_BUFFER_MAX_LENGTH] = {0};
-    char name[MESSAGE_MAX_LENGTH];
-    struct client_message file_part;
-    client_connection *client = NULL;
+    char file_data_buffer[MESSAGE_MAX_LENGTH] = {0};
+    char filename_buffer[MESSAGE_MAX_LENGTH];
+    struct client_message file_part_datagramm;
+    client_connection *connection_for_client = NULL;
 
-    if ((client = get_client_info(list, receiver)) == NULL) {
+    if ((connection_for_client = get_connection(connections, client)) == NULL) {
         fprintf(stderr, "No such client for sending\n");
         return -1;
     }
 
-    file_part.type = FILE_MSG;
-    strncpy(file_part.filename, filename, MESSAGE_MAX_LENGTH);
+    file_part_datagramm.type = FILE_SEND_MSG;
+    strncpy(file_part_datagramm.filename, filename, MESSAGE_MAX_LENGTH);
 
-    strncpy(name, filename, strlen(filename));
+    strncpy(filename_buffer, filename, strlen(filename));
 
-    fd = fopen(name, "rb");
-    fseek(fd, 0L, SEEK_END);
-    filesize = ftell(fd);
-    rewind(fd);
-    file_part.size = filesize;
+    file_descriptor = fopen(filename_buffer, "rb");
+    fseek(file_descriptor, 0L, SEEK_END);
+    filesize = ftell(file_descriptor);
+    rewind(file_descriptor);
+    file_part_datagramm.filesize = filesize;
 
-    /*if (send(client->client_socket, &file_part, sizeof(file_part), 0) < 0){
-        perror("send file size");
-        fclose(fd);
-        return 1;
-    }*/
-
-    if (SSL_write(client->ssl, &file_part, sizeof(file_part)) <= 0){
-        fprintf(stderr, "Failed to send a file size for client %s\n", client->client_name);
+    if (SSL_write(connection_for_client->ssl_object, &file_part_datagramm, sizeof(file_part_datagramm)) <= 0){
+        fprintf(stderr, "Failed to send a file size for client %s\n", connection_for_client->client_name);
         ERR_print_errors_fp(stderr);
-        fclose(fd);
+        fclose(file_descriptor);
         return 1;
     }
 
     while (bytes_send < filesize) {
-        int bytes_to_read = (filesize - bytes_send < FILE_BUFFER_MAX_LENGTH) ? filesize - bytes_send : FILE_BUFFER_MAX_LENGTH;
-        int read = fread(buf, 1, bytes_to_read, fd);
+        int bytes_to_read = (filesize - bytes_send < MESSAGE_MAX_LENGTH) ? filesize - bytes_send : MESSAGE_MAX_LENGTH;
+        int read = fread(file_data_buffer, 1, bytes_to_read, file_descriptor);
         bytes_send += read;
         
-        /*if (send(client->client_socket, &buf, read, 0) < 0) {
-            fprintf(stderr, "Failed to send a file for client %s: %s\n", 
-                    client->client_name, 
-                    strerror(errno));
-            fclose(fd);
-            return -1;
-        }*/
-        if (SSL_write(client->ssl, &buf, read) <= 0) {
-            fprintf(stderr, "Failed to send a file for client %s\n", client->client_name);
+        if (SSL_write(connection_for_client->ssl_object, &file_data_buffer, read) <= 0) {
+            fprintf(stderr, "Failed to send a file for client %s\n", connection_for_client->client_name);
             ERR_print_errors_fp(stderr);
-            fclose(fd);
+            fclose(file_descriptor);
             return -1;
         }
     }
 
-    fclose(fd);
+    fclose(file_descriptor);
     return 0;
 }
