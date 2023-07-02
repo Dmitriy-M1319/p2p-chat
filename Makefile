@@ -16,6 +16,9 @@ messenger.o: src/messenger.c
 ssl_utils.o: src/ssl_utils.c
 	$(CC) $(CFLAGS) -c src/ssl_utils.c
 
+documentation:
+	doxygen doxygen-conf
+
 clean:
 	rm *.o
 	rm bin/chat_client

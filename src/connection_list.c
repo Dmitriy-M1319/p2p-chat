@@ -33,32 +33,6 @@ void print_connections_ptr(client_connection *connections_ptr)
     }
 }
 
-
-client_connection *add_new_connection(struct client_connection_node *connections, 
-        const char *client, 
-        const int socket, 
-        const struct sockaddr_in *addr_info)
-{
-    if (connections == NULL) {
-        return NULL;
-    }
-    struct client_connection_node *connection_ptr = connections;
-    while (connection_ptr->next != NULL) {
-        connection_ptr = connection_ptr->next;
-    }
-
-    if((connection_ptr->next = (struct client_connection_node *)malloc(sizeof(struct client_connection_node))) == NULL ) {
-        return NULL;
-    }
-
-    strncpy(connection_ptr->next->client_name, client, CLIENT_NAME_MAX_LENGTH);
-    connection_ptr->next->client_socket = socket;
-    memcpy(&connection_ptr->next->client_address_info, addr_info, sizeof(struct sockaddr_in));
-    connection_ptr->next->next = NULL;
-
-    return connection_ptr->next;
-}
-
 client_connection *add_new_secure_connection(struct client_connection_node *connections, 
         const char *client, 
         const int socket, 
