@@ -137,36 +137,6 @@ int send_connection_response(const int udp_socket, struct sockaddr *client_addre
     return 0;
 }
 
-int create_client_connection(struct query_datagramm *data, client_connection *connections)
-{
-    int status, new_client_socket;
-    struct sockaddr_in client_address;
-    socklen_t length = sizeof(client_address);
-
-    printf("Получен ответ на запрос подключения от %s\n", data->nickname);
-
-    new_client_socket = create_tcp_socket_for_client();
-    client_address.sin_port = htons(data->port);
-    client_address.sin_family = AF_INET;
-    inet_aton(data->address, &(client_address.sin_addr));
-    puts(data->address);
-    printf("%d\n", data->port);
-
-    sleep(3);
-    if(connect(new_client_socket, (struct sockaddr *)&client_address, length) < 0) {
-        fprintf(stderr, "Failed to connect to new client: %s\n", strerror(errno));
-        return -1;
-    }
-
-    if(!add_new_connection(connections, data->nickname, new_client_socket, &client_address)) {
-        fprintf(stderr, "Failed to add new client %s\n", data->nickname);
-        return -1;
-    }
-
-    printf("Клиент %s успешно подключен", data->nickname);
-    return new_client_socket;
-}
-
 
 int create_secure_connection(struct query_datagramm *data, client_connection *connections)
 {
